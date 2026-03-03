@@ -185,7 +185,7 @@ Pancharts 提供了两种方法，使用大语言模型修改图表配置：
 首先需要通过get_config_file_path获得配置文件的路径：
 
 ```python
-from pancharts import get_config_file_path
+from pancharts.utils import get_config_file_path
 
 config_path = get_config_file_path()
 print(config_path)
@@ -193,9 +193,11 @@ print(config_path)
 
 然后去配置文件中修改如下配置项：
 
+```python
 DEFAULT_AI_API_KEY = ""              # 你的大模型 API 密钥
 DEFAULT_AI_BASE_URL = ""             # 大模型接口地址，如 https://api.openai.com/v1
 DEFAULT_AI_MODEL_NAME = ""           # 所用大模型名称，如 gpt-4o、deepseek-chat 等
+```
 
 ### 1. `patch_option()` - 基于补丁的更新（推荐）
 
