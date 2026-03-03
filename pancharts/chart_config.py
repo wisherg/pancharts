@@ -11,6 +11,9 @@ DEFAULT_AI_API_KEY = ""
 DEFAULT_AI_BASE_URL = ""
 DEFAULT_AI_MODEL_NAME = ""
 
+# node_modules文件夹的绝对地址,通过设置此路径使用本地的echarts库
+NODE_MODULES_PATH = None
+
 # 柱状图配置
 BAR_OPTION = {
     "legend": {},
