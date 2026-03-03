@@ -1,0 +1,3 @@
+include pancharts/templates/*.html
+include pancharts/datasets/*.csv
+include pancharts/datasets/*.json

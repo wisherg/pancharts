@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ECharts 可视化</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        [id="chart-{{ random_id }}"] {
+            width: {{ width }};
+            height: {{ height }};
+        }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="chart-{{ random_id }}"></div>
+    </div>
+
+    <!-- 引入 ECharts 文件 -->
+    <script src="{{ echarts_js_path }}"></script>
+    
+    <!-- 引入 ECharts GL 文件（用于3D图表） -->
+    {% if use_echarts_gl %}
+    <script src="{{ echarts_gl_js_path }}"></script>
+    {% endif %}
+    
+    <!-- 引入 ECharts WordCloud 文件（用于词云图） -->
+    {% if use_echarts_wordcloud %}
+    <script src="{{ echarts_wordcloud_js_path }}"></script>
+    {% endif %}
+    
+    <!-- 引入地图数据文件 -->
+    {% if is_map_chart %}
+    <script src="{{ map_url }}"></script>
+    {% endif %}
+
+    <script>
+        // 初始化 ECharts 实例
+        var chart = echarts.init(document.getElementById('chart-{{ random_id }}'), '{{ theme }}', { renderer: '{{ renderer }}' });
+        
+        // 设置图表配置项
+        var option = {{ option|tojson }};
+        
+        // 使用配置项渲染图表
+        chart.setOption(option);
+        
+        // 响应式处理
+        window.addEventListener('resize', function() {
+            chart.resize();
+        });
+    </script>
+</body>
+</html>
