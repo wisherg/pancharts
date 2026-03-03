@@ -184,7 +184,7 @@ Pancharts provides two methods to modify chart configurations using large langua
 First, you need to obtain the configuration file path using `get_config_file_path`:
 
 ```python
-from pancharts import get_config_file_path
+from pancharts.utils import get_config_file_path
 
 config_path = get_config_file_path()
 print(config_path)
@@ -192,10 +192,11 @@ print(config_path)
 
 Then modify the following configuration items in the config file:
 
+```python
 DEFAULT_AI_API_KEY = ""              # Your LLM API key, e.g. sk-...
 DEFAULT_AI_BASE_URL = ""             # LLM API endpoint, e.g. https://api.openai.com/v1
 DEFAULT_AI_MODEL_NAME = ""           # LLM model name, e.g. gpt-4o, deepseek-chat
-
+```
 
 ### 1. `patch_option()` - Patch-Based Updates (Recommended)
 
