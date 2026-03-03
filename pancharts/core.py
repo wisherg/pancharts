@@ -286,28 +286,34 @@ class Pancharts:
                         break
         
         # 选择echarts引入路径
+        from .chart_config import NODE_MODULES_PATH
+        
         if self.echarts_source == "local":
-            # 检查本地文件是否存在，不存在则自动切换到在线版
-            local_echarts_path = Path("node_modules/echarts/dist/echarts.min.js")
-            local_echarts_gl_path = Path("node_modules/echarts-gl/dist/echarts-gl.min.js")
-            local_echarts_wordcloud_path = Path("node_modules/echarts-wordcloud/dist/echarts-wordcloud.min.js")
-            
-            if local_echarts_path.exists():
-                echarts_js_path = "node_modules/echarts/dist/echarts.min.js"
+            # 优先使用配置的node_modules绝对路径
+            if NODE_MODULES_PATH:
+                custom_echarts_path = Path(NODE_MODULES_PATH) / "echarts/dist/echarts.min.js"
+                custom_echarts_gl_path = Path(NODE_MODULES_PATH) / "echarts-gl/dist/echarts-gl.min.js"
+                custom_echarts_wordcloud_path = Path(NODE_MODULES_PATH) / "echarts-wordcloud/dist/echarts-wordcloud.min.js"
+                
+                if custom_echarts_path.exists():
+                    echarts_js_path = str(custom_echarts_path)
+                else:
+                    # 配置的绝对路径文件不存在，直接使用在线资源
+                    echarts_js_path = "https://assets.pyecharts.org/assets/v5/echarts.min.js"
+                
+                if custom_echarts_gl_path.exists():
+                    echarts_gl_js_path = str(custom_echarts_gl_path)
+                else:
+                    echarts_gl_js_path = "https://assets.pyecharts.org/assets/v5/echarts-gl.min.js"
+                
+                if custom_echarts_wordcloud_path.exists():
+                    echarts_wordcloud_js_path = str(custom_echarts_wordcloud_path)
+                else:
+                    echarts_wordcloud_js_path = "https://assets.pyecharts.org/assets/v5/echarts-wordcloud.min.js"
             else:
-                # 本地文件不存在，切换到pyecharts的在线资源
+                # 没有配置绝对路径，直接使用在线资源
                 echarts_js_path = "https://assets.pyecharts.org/assets/v5/echarts.min.js"
-            
-            if local_echarts_gl_path.exists():
-                echarts_gl_js_path = "node_modules/echarts-gl/dist/echarts-gl.min.js"
-            else:
-                # 本地文件不存在，切换到pyecharts的在线资源
                 echarts_gl_js_path = "https://assets.pyecharts.org/assets/v5/echarts-gl.min.js"
-            
-            if local_echarts_wordcloud_path.exists():
-                echarts_wordcloud_js_path = "node_modules/echarts-wordcloud/dist/echarts-wordcloud.min.js"
-            else:
-                # 本地文件不存在，切换到pyecharts的在线资源
                 echarts_wordcloud_js_path = "https://assets.pyecharts.org/assets/v5/echarts-wordcloud.min.js"
         else:
             # 在线版使用pyecharts的在线资源
@@ -343,12 +349,12 @@ class Pancharts:
                 map_filename = self._map_filename_dict[self.map_name][0].replace("maps/", "")
             
             # 检查本地资源（仅当echarts_source为local时）
-            local_map_path = None
             if self.echarts_source == "local":
-                local_map_path = Path("node_modules/echarts/map/js/" + map_filename + ".js")
-                if local_map_path.exists():
-                    # 本地有地图数据文件，使用本地路径
-                    map_url = str(local_map_path)
+                # 优先使用配置的node_modules绝对路径
+                if NODE_MODULES_PATH:
+                    custom_map_path = Path(NODE_MODULES_PATH) / "echarts/map/js" / (map_filename + ".js")
+                    if custom_map_path.exists():
+                        map_url = str(custom_map_path)
             
             # 如果本地没有地图数据文件或使用在线资源，使用pyecharts在线地图数据源
             if not map_url:
