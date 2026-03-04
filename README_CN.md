@@ -73,6 +73,7 @@ map_data = pd.Series(
 chart = k_v(map_data).map("china")
 chart.render()
 ```
+![柱图](images/kv_bar0.png)
 
 ### 2. `km_nv`：多列索引 Series
 
