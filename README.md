@@ -103,7 +103,8 @@ chart.render()
 chart = km_nv(data).treemap(num=0)
 chart.render()
 ```
-
+![](images/sunburst0.png)
+![](images/treemap0.png)
 ### 3. `k2_nv`: Two-Level Index Series
 
 Use for pandas Series with exactly two levels of indexes. Perfect for relationship data.
