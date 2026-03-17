@@ -182,6 +182,10 @@ chart.render()
 
 ## AI-Powered Configuration Modification
 
+```bash
+pip install openai
+```
+
 Pancharts provides two methods to modify chart configurations using large language models:
 First, you need to obtain the configuration file path using `get_config_file_path`:
 
