@@ -182,6 +182,10 @@ chart.render()
 
 ## AI 驱动的配置修改
 
+```bash
+pip install openai
+```
+
 Pancharts 提供了两种方法，使用大语言模型修改图表配置：
 首先需要通过get_config_file_path获得配置文件的路径：
 
