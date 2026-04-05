@@ -32,13 +32,14 @@ class AIOptionModifier:
         )
         self.model_name = model_name or DEFAULT_AI_MODEL_NAME
     
-    def modify_option(self, current_option: dict, prompt: str) -> dict:
+    def modify_option(self, current_option: dict, prompt: str, verbose: bool = False) -> dict:
         """
         通过AI大模型修改option
         
         参数：
             current_option: dict - 当前的ECharts option
             prompt: str - 修改要求
+            verbose: bool - 是否打印大模型的返回结果，默认为False
             
         返回：
             dict - 修改后的ECharts option
@@ -82,6 +83,12 @@ class AIOptionModifier:
                 response_content = response_content[:-3]
             response_content = response_content.strip()
             
+            # 打印大模型返回结果（如果verbose为True）
+            if verbose:
+                print("AI Model Response:")
+                print(response_content)
+                print()
+            
             # 解析JSON
             new_option = json.loads(response_content)
             
@@ -95,13 +102,14 @@ class AIOptionModifier:
             # 如果API调用失败，返回原始option
             return current_option
     
-    def generate_patch(self, current_option: dict, prompt: str) -> dict:
+    def generate_patch(self, current_option: dict, prompt: str, verbose: bool = False) -> dict:
         """
         通过AI大模型生成只包含修改处的键值对的补丁字典
         
         参数：
             current_option: dict - 当前的ECharts option
             prompt: str - 修改要求
+            verbose: bool - 是否打印大模型的返回结果，默认为False
             
         返回：
             dict - 只包含修改处的键值对的补丁字典
@@ -145,6 +153,12 @@ class AIOptionModifier:
             if response_content.endswith('```'):
                 response_content = response_content[:-3]
             response_content = response_content.strip()
+            
+            # 打印大模型返回结果（如果verbose为True）
+            if verbose:
+                print("AI Model Response:")
+                print(response_content)
+                print()
             
             # 解析JSON
             patch = json.loads(response_content)
