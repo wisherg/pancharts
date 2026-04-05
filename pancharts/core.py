@@ -12,6 +12,8 @@ import random
 from pathlib import Path
 from jinja2 import Environment, FileSystemLoader
 
+from .chart_config import GLOBAL_DEFAULT_CONFIG
+
 
 class Pancharts:
     """
@@ -50,11 +52,12 @@ class Pancharts:
         
         # 初始化默认属性，在_prepare_render_data中会重新设置
         self._init = {}
-        self.echarts_source = "local"
-        self._width = "100%"
-        self._height = "600px"
-        self._renderer = "canvas"
-        self._theme = ""
+        # 从全局配置中获取默认值
+        self.echarts_source = GLOBAL_DEFAULT_CONFIG.get("init", {}).get("echarts_source", "local")
+        self._width = GLOBAL_DEFAULT_CONFIG.get("init", {}).get("width", "50%")
+        self._height = GLOBAL_DEFAULT_CONFIG.get("init", {}).get("height", "600px")
+        self._renderer = GLOBAL_DEFAULT_CONFIG.get("init", {}).get("renderer", "canvas")
+        self._theme = GLOBAL_DEFAULT_CONFIG.get("init", {}).get("theme", "")
         
         # 初始化地图相关属性，在_prepare_render_data中会重新检测和设置
         self._map_filename_dict = {}
@@ -65,9 +68,11 @@ class Pancharts:
     @property
     def option(self):
         """获取ECharts配置"""
-        # 合并所有配置项
+        # 合并所有配置项，优先级：user_option > data_config > graph_config > GLOBAL_DEFAULT_CONFIG
         from .utils import deep_merge
-        merged = deep_merge(self._graph_config, self._data_config)
+        merged = GLOBAL_DEFAULT_CONFIG.copy()
+        merged = deep_merge(merged, self._graph_config)
+        merged = deep_merge(merged, self._data_config)
         merged = deep_merge(merged, self._user_option)
         return merged
     
@@ -93,7 +98,7 @@ class Pancharts:
         return self
     
     def modify_option(self, prompt: str, api_key: str = None, 
-                     base_url: str = None, model_name: str = None) -> "Pancharts":
+                     base_url: str = None, model_name: str = None, verbose: bool = False) -> "Pancharts":
         """
         使用AI大模型修改option样式
         支持DeepSeek、ChatGPT、千问等多种大模型
@@ -103,6 +108,7 @@ class Pancharts:
             api_key: str - API密钥，默认为chart_config中的DEFAULT_AI_API_KEY
             base_url: str - API基础URL，默认为chart_config中的DEFAULT_AI_BASE_URL
             model_name: str - 模型名称，默认为chart_config中的DEFAULT_AI_MODEL_NAME
+            verbose: bool - 是否打印大模型的返回结果，默认为False
             
         返回：
             self - 支持链式调用
@@ -116,7 +122,7 @@ class Pancharts:
         modifier = AIOptionModifier(api_key=api_key, base_url=base_url, model_name=model_name)
         
         # 获取修改后的option
-        new_option = modifier.modify_option(current_option, prompt)
+        new_option = modifier.modify_option(current_option, prompt, verbose=verbose)
         
         # 更新user_option，只保留样式修改
         self._user_option = new_option
@@ -124,7 +130,7 @@ class Pancharts:
         return self
     
     def patch_option(self, prompt: str, api_key: str = None, 
-                    base_url: str = None, model_name: str = None) -> "Pancharts":
+                    base_url: str = None, model_name: str = None, verbose: bool = False) -> "Pancharts":
         """
         使用AI大模型生成只包含修改处的补丁字典，然后通过deep_merge合并到原始option中
         支持DeepSeek、ChatGPT、千问等多种大模型
@@ -134,6 +140,7 @@ class Pancharts:
             api_key: str - API密钥，默认为chart_config中的DEFAULT_AI_API_KEY
             base_url: str - API基础URL，默认为chart_config中的DEFAULT_AI_BASE_URL
             model_name: str - 模型名称，默认为chart_config中的DEFAULT_AI_MODEL_NAME
+            verbose: bool - 是否打印大模型的返回结果，默认为False
             
         返回：
             self - 支持链式调用
@@ -148,7 +155,7 @@ class Pancharts:
         modifier = AIOptionModifier(api_key=api_key, base_url=base_url, model_name=model_name)
         
         # 获取修改补丁
-        patch = modifier.generate_patch(current_option, prompt)
+        patch = modifier.generate_patch(current_option, prompt, verbose=verbose)
         
         # 通过deep_merge将补丁合并到user_option中
         self._user_option = deep_merge(self._user_option, patch)
