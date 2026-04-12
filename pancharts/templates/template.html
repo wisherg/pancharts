@@ -57,7 +57,7 @@
         var chart = echarts.init(document.getElementById('chart-{{ random_id }}'), '{{ theme }}', { renderer: '{{ renderer }}' });
         
         // 设置图表配置项
-        var option = {{ option|tojson }};
+        var option = {{ option|safe }};
         
         // 使用配置项渲染图表
         chart.setOption(option);
