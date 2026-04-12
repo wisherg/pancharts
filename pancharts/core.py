@@ -15,6 +15,16 @@ from jinja2 import Environment, FileSystemLoader
 from .chart_config import GLOBAL_DEFAULT_CONFIG
 
 
+class JsCode:
+    """
+    用于标记JavaScript代码的特殊类
+    当option中包含 "JsCode:function..." 格式的字符串时，会被转换为此类实例
+    在渲染时会被正确处理为JavaScript代码
+    """
+    def __init__(self, code):
+        self.code = code
+
+
 class Pancharts:
     """
     ECharts可视化生成类
@@ -97,29 +107,27 @@ class Pancharts:
         self._user_option = deep_merge(self._user_option, dict2)
         return self
     
-    def modify_option(self, prompt: str, api_key: str = None, 
-                     base_url: str = None, model_name: str = None, verbose: bool = False) -> "Pancharts":
+    def modify_option(self, prompt: str, verbose: bool = False) -> "Pancharts":
         """
         使用AI大模型修改option样式
         支持DeepSeek、ChatGPT、千问等多种大模型
         
         参数：
             prompt: str - 修改要求
-            api_key: str - API密钥，默认为chart_config中的DEFAULT_AI_API_KEY
-            base_url: str - API基础URL，默认为chart_config中的DEFAULT_AI_BASE_URL
-            model_name: str - 模型名称，默认为chart_config中的DEFAULT_AI_MODEL_NAME
             verbose: bool - 是否打印大模型的返回结果，默认为False
             
         返回：
             self - 支持链式调用
+            
+        注意：API配置（api_key、base_url、model_name）现在只能通过chart_config.py配置文件设置
         """
         from .ai_option_modifier import AIOptionModifier
         
         # 获取当前option
         current_option = self.option
         
-        # 创建修改器实例
-        modifier = AIOptionModifier(api_key=api_key, base_url=base_url, model_name=model_name)
+        # 创建修改器实例（配置从chart_config获取）
+        modifier = AIOptionModifier()
         
         # 获取修改后的option
         new_option = modifier.modify_option(current_option, prompt, verbose=verbose)
@@ -129,21 +137,19 @@ class Pancharts:
         
         return self
     
-    def patch_option(self, prompt: str, api_key: str = None, 
-                    base_url: str = None, model_name: str = None, verbose: bool = False) -> "Pancharts":
+    def patch_option(self, prompt: str, verbose: bool = False) -> "Pancharts":
         """
         使用AI大模型生成只包含修改处的补丁字典，然后通过deep_merge合并到原始option中
         支持DeepSeek、ChatGPT、千问等多种大模型
         
         参数：
             prompt: str - 修改要求
-            api_key: str - API密钥，默认为chart_config中的DEFAULT_AI_API_KEY
-            base_url: str - API基础URL，默认为chart_config中的DEFAULT_AI_BASE_URL
-            model_name: str - 模型名称，默认为chart_config中的DEFAULT_AI_MODEL_NAME
             verbose: bool - 是否打印大模型的返回结果，默认为False
             
         返回：
             self - 支持链式调用
+            
+        注意：API配置（api_key、base_url、model_name）现在只能通过chart_config.py配置文件设置
         """
         from .ai_option_modifier import AIOptionModifier
         from .utils import deep_merge
@@ -151,8 +157,8 @@ class Pancharts:
         # 获取当前option
         current_option = self.option
         
-        # 创建修改器实例
-        modifier = AIOptionModifier(api_key=api_key, base_url=base_url, model_name=model_name)
+        # 创建修改器实例（配置从chart_config获取）
+        modifier = AIOptionModifier()
         
         # 获取修改补丁
         patch = modifier.generate_patch(current_option, prompt, verbose=verbose)
@@ -161,6 +167,33 @@ class Pancharts:
         self._user_option = deep_merge(self._user_option, patch)
         
         return self
+    
+    def _process_jscode_in_json(self, json_str):
+        """
+        处理JSON字符串中的__jscode__标记，将其转换为实际的JavaScript代码
+        
+        参数：
+            json_str: str - JSON字符串
+            
+        返回：
+            str - 处理后的字符串，__jscode__标记已被转换为JavaScript代码
+        """
+        import re
+        
+        # 匹配 {"__jscode__": "..."} 模式并替换为实际的JavaScript代码
+        # 注意：这里需要处理转义的引号
+        pattern = r'\{"__jscode__":\s*"([^"]*)"\}'
+        
+        def replace_jscode(match):
+            # 获取JavaScript代码（需要处理转义字符）
+            js_code = match.group(1)
+            # 还原转义的引号
+            js_code = js_code.replace('\\"', '"')
+            js_code = js_code.replace("\\'", "'")
+            return js_code
+        
+        result = re.sub(pattern, replace_jscode, json_str)
+        return result
     
     def _custom_json_serializer(self, obj):
         """
@@ -176,9 +209,16 @@ class Pancharts:
         import numpy as np
         import datetime
         
+        # 处理布尔值（必须在数值类型之前，因为bool是int的子类）
+        if isinstance(obj, bool):
+            return obj
         # 处理pandas Timestamp对象
-        if isinstance(obj, pd.Timestamp):
-            return obj.strftime('%Y-%m-%d %H:%M:%S')
+        elif isinstance(obj, pd.Timestamp):
+            # 如果只有日期部分（时间为00:00:00），只输出日期
+            if obj.hour == 0 and obj.minute == 0 and obj.second == 0 and obj.nanosecond == 0:
+                return obj.strftime('%Y-%m-%d')
+            else:
+                return obj.strftime('%Y-%m-%d %H:%M:%S')
         # 处理pandas DatetimeIndex对象
         elif isinstance(obj, pd.DatetimeIndex):
             return [self._custom_json_serializer(x) for x in obj]
@@ -196,7 +236,11 @@ class Pancharts:
             return obj.tolist()
         # 处理datetime对象
         elif isinstance(obj, datetime.datetime):
-            return obj.strftime('%Y-%m-%d %H:%M:%S')
+            # 如果只有日期部分（时间为00:00:00），只输出日期
+            if obj.hour == 0 and obj.minute == 0 and obj.second == 0:
+                return obj.strftime('%Y-%m-%d')
+            else:
+                return obj.strftime('%Y-%m-%d %H:%M:%S')
         # 处理其他类型
         else:
             try:
@@ -394,11 +438,29 @@ class Pancharts:
                 return {k: recursive_serialize(v) for k, v in obj.items()}
             elif isinstance(obj, list):
                 return [recursive_serialize(item) for item in obj]
+            elif isinstance(obj, tuple):
+                return [recursive_serialize(item) for item in obj]
+            elif isinstance(obj, str) and obj.startswith("JsCode:"):
+                # 识别并处理JavaScript代码
+                return JsCode(obj[7:])  # 去掉"JsCode:"前缀
             else:
                 return self._custom_json_serializer(obj)
         
         # 序列化option
         rendered_option = recursive_serialize(rendered_option)
+        
+        # 自定义JSON编码器，处理JsCode对象
+        class JsCodeEncoder(json.JSONEncoder):
+            def default(self, obj):
+                if isinstance(obj, JsCode):
+                    return {'__jscode__': obj.code}
+                return super().default(obj)
+        
+        # 使用自定义编码器序列化option
+        rendered_option = json.dumps(rendered_option, cls=JsCodeEncoder, ensure_ascii=False)
+        
+        # 处理JSON字符串中的__jscode__标记，将其转换为实际的JavaScript代码
+        rendered_option = self._process_jscode_in_json(rendered_option)
         
         return {
             "echarts_js_path": echarts_js_path,
@@ -410,13 +472,13 @@ class Pancharts:
             "rendered_option": rendered_option
         }
     
-    def render(self, output_dir=".", filename="index.html"):
+    def render(self, filename="index.html", output_dir="."):
         """
         渲染HTML文件
 
         参数：
-            output_dir: str - 输出目录，默认当前目录
             filename: str - 输出文件名，默认index.html
+            output_dir: str - 输出目录，默认当前目录
 
         返回：
             str - 生成的HTML文件路径
