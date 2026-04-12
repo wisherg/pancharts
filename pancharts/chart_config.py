@@ -15,6 +15,7 @@ DEFAULT_AI_MODEL_NAME = ""
 NODE_MODULES_PATH = None
 
 # 全局默认配置，优先级最低
+# https://echarts.apache.org/zh/theme-builder.html
 GLOBAL_DEFAULT_CONFIG = {
     "init": {
         "echarts_source": "online",
