@@ -18,6 +18,7 @@ from .utils import (
     load_city_lnglat,
     load_countries_info
 )
+from .agent import call_openai_api, parse_json_response, pchat, echat
 from .chart_config import (
     BAR_OPTION,
     LINE_OPTION,
@@ -38,8 +39,8 @@ from .chart_config import (
     CALENDAR_OPTION
 )
 
-__version__ = "0.1.0"
-__author__ = "Wang Peng"
+__version__ = "0.1.3"
+__author__ = "wang peng"
 __email__ = "wangpeng_621@163.com"
 
 __all__ = [
@@ -57,6 +58,10 @@ __all__ = [
     "load_city_cnname",
     "load_city_lnglat",
     "load_countries_info",
+    "call_openai_api",
+    "parse_json_response",
+    "pchat",
+    "echat",
     "BAR_OPTION",
     "LINE_OPTION",
     "SCATTER_OPTION",
