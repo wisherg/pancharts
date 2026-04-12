@@ -15,7 +15,7 @@
         ], function(echarts) {
                 var chart_{{ chart_id }} = echarts.init(
                     document.getElementById('{{ chart_id }}'), '{{ theme }}', {renderer: '{{ renderer }}', locale: 'ZH'});
-                var option_{{ chart_id }} = {{ option|tojson }};
+                var option_{{ chart_id }} = {{ option|safe }};
                 chart_{{ chart_id }}.setOption(option_{{ chart_id }});
         });
     </script>
