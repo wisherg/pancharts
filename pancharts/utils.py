@@ -63,10 +63,14 @@ def get_index_type(x):
     返回:
         str - 索引类型，可选值为"category"、"time"或"value"
     """
-    if x.index.dtype == 'object':
+    if pd.api.types.is_object_dtype(x.index.dtype):
+        return 'category'
+    if pd.api.types.is_string_dtype(x.index.dtype):
         return 'category'
     if pd.api.types.is_datetime64_any_dtype(x.index.dtype):
         return 'time'
+    if isinstance(x.index.dtype, pd.CategoricalDtype):
+        return 'category'
     return 'value'
 
 def get_value_type(x):
@@ -82,8 +86,12 @@ def get_value_type(x):
     dtype = x.dtype
     if pd.api.types.is_object_dtype(dtype):
         return 'category'
+    if pd.api.types.is_string_dtype(dtype):
+        return 'category'
     if pd.api.types.is_datetime64_any_dtype(dtype):
         return 'time'
+    if isinstance(dtype, pd.CategoricalDtype):
+        return 'category'
     return 'value'
 
 def deep_merge(dict1, dict2):
