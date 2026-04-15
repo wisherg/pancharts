@@ -104,7 +104,7 @@ def pchat(question: str) -> None:
     import os
     
     # 获取文档路径
-    doc_path = os.path.join(os.path.dirname(__file__), '..', 'doc', 'document_cn.md')
+    doc_path = os.path.join(os.path.dirname(__file__), 'datasets', 'document_cn.md')
     doc_path = os.path.abspath(doc_path)
     
     # 读取文档内容
