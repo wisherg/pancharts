@@ -437,9 +437,10 @@ class k_vm:
         schema = []
         n = 0
         for i in self.data:
-            if self.data[i].dtype.str[0] == '|':
+            value_type = get_value_type(self.data[i])
+            if value_type == 'category':
                 schema.append({"dim": n, "name": i, "type": "category", "data": self.data[i].unique().tolist()})
-            elif self.data[i].dtype.str[0] == '<':
+            else:
                 schema.append({"dim": n, "name": i, "type": "value"})
             n = n + 1
         return schema
