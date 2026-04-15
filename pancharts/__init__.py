@@ -39,7 +39,7 @@ from .chart_config import (
     CALENDAR_OPTION
 )
 
-__version__ = "0.1.3.2"
+__version__ = "0.1.3.3"
 __author__ = "wang peng"
 __email__ = "wangpeng_621@163.com"
 
