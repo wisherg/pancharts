@@ -163,18 +163,16 @@ def echat(question: str) -> None:
     2. 输出的配置部分必须是有效的JSON格式
     3. 当需要使用JavaScript函数时，必须将函数代码用"JsCode:"前缀包裹
        例如：{"formatter": "JsCode:function(params) { return params.name + ': ' + params.value; }"}
-    4. 只返回option配置，option内部不要包含其他解释文字，外部可以有适当的解释
-    5. 如果用户的问题需要完整的图表配置，生成完整的option；如果只是部分配置，生成部分配置
+    4. 此配置的中布尔需要符合python规范，即需要写成True与False。
+    5. 只返回option配置，option内部不要包含其他解释文字
+    6. 如果用户的问题需要完整的图表配置，生成完整的option；如果只是部分配置，生成部分配置
     """
     
     # 用户提示词
     user_prompt = f"""
     用户问题: {question}
     
-    请根据问题生成对应的ECharts option配置，注意：
-    - 使用双引号
-    - JavaScript函数需要添加"JsCode:"前缀
-    - 只返回JSON格式的option，不要包含其他内容
+    请根据问题生成对应的ECharts option配置，不要包含其他内容
     """
     
     # 调用AI API
