@@ -22,11 +22,16 @@ from pancharts.chart_config import (
     SANKEY_OPTION,
     HEATMAP_OPTION,
     PARALLEL_OPTION,
-    RADAR_OPTION,
+    RADAR_OPTION,   
+    MAP_OPTION,
+    MAP3D_OPTION,
     CALENDAR_OPTION,
-    MAP_OPTION
+    GEO_OPTION,
+    GEO_GRAPH_OPTION,
+    GEO3D_BAR3D_OPTION,
+    GEO3D_LINES3D_OPTION
 )
-from pancharts.utils import get_index_type, get_value_type, random_color,deep_merge
+from pancharts.utils import get_index_type, get_value_type, random_color, deep_merge, create_visual_map
 from pancharts.core import Pancharts
 
 
@@ -67,23 +72,29 @@ class k_v:
         self.xaxis_type = get_index_type(data)
         self.yaxis_type = get_value_type(data)
         self.base_data = []
-        for i in data.sort_values(ascending=False).items():
+        self.xdata = []
+        for i in data.items():
             self.base_data.append({"name": i[0], "value": i[1]})
-        try:
+            self.xdata.append(i[0])
+        
+        # 按照优先级：data.index.name > data.name > ""
+        self.legend = ""
+        if data.index.name:
             self.legend = data.index.name
-        except:
-            self.legend = ""
+        elif data.name:
+            self.legend = data.name
 
         self.rect_data_config = {
             'xAxis': {
-                'type': self.xaxis_type
+                'type': self.xaxis_type,
+                'data': self.xdata
             },
             'yAxis': {
                 'type': self.yaxis_type
             },
             'series': [
                 {
-                    'data': self.rect_data, "name": self.legend
+                    'data': self.base_data, "name": self.legend
                 }
             ]
         }
@@ -311,6 +322,7 @@ class k2_nv:
         self.data = data
         self.df_data = self.data.reset_index()
         self.bar3d_data = self.df_data.values.tolist()
+        self.bar3d_data_object=[{"value":i} for i in self.bar3d_data]
         self.xtype = get_value_type(self.df_data.iloc[:, 0])
         self.ytype = get_value_type(self.df_data.iloc[:, 1])
         self.ztype = get_value_type(self.df_data.iloc[:, 2])
@@ -319,7 +331,7 @@ class k2_nv:
             'xAxis3D': {'type': self.xtype},
             'yAxis3D': {'type': self.ytype},
             'zAxis3D': {'type': self.ztype},
-            'series': [{"data": self.bar3d_data}]
+            'series': [{"data": self.bar3d_data_object}]
         }
         self.nodes, self.links = self.bi_network_data()
         self.graph_data_option = {
@@ -434,6 +446,8 @@ class k_vm:
         }
     
     def parallel_schema(self):
+        from .utils import get_value_type
+        
         schema = []
         n = 0
         for i in self.data:
@@ -628,3 +642,108 @@ class k_vm:
             data_config=self.dataset_option,
             user_option=config
         )
+
+class gk_vm:
+    """
+    用于可视化pandas中的表示地理数据的单列索引、多列数值型数据的DataFrame,单列索引为地理位置名称，多列默认前两列为经纬度。
+    """
+    def __init__(self,data,map_type:str):
+        self.data = data
+        self.map_type = map_type
+        self.geo_data=[]
+        for i in self.data.iterrows():
+            self.geo_data.append({
+                'name':i[0],
+                'value':i[1].tolist()
+            })
+        self.geo_map={"geo":{"map":self.map_type}}
+        self.geo3d_map={"geo3D":{"map":self.map_type}}
+        
+
+    def scatter(self, dimension: int | list = 2, visual_type: str | list = "color", config: dict | None = {}):
+      
+        geo_data_option = {
+            "series": [{
+                "type": "scatter",
+                "coordinateSystem": "geo",
+                "data": self.geo_data}]
+        }
+        geo_data_option.update(self.geo_map)
+        geo_data_option.update(create_visual_map(self.data, visual_type, dimension))
+        return Pancharts(graph_config=GEO_OPTION, data_config=geo_data_option, user_option=config)
+
+    def escatter(self, dimension: int | list = 2, visual_type: str | list = "color", config: dict | None = {}):
+      
+        geo_data_option = {
+            "series": [{
+                "type": "effectScatter",
+                "coordinateSystem": "geo",
+                "data": self.geo_data}]
+        }
+        geo_data_option.update(self.geo_map)
+        geo_data_option.update(create_visual_map(self.data, visual_type, dimension))
+        return Pancharts(graph_config=GEO_OPTION, data_config=geo_data_option, user_option=config)
+    
+    def heatmap(self, dimension: int | list = 2, visual_type: str | list = "color", config: dict | None = {}):
+      
+        geo_data_option = {
+            "series": [{
+                "type": "heatmap",
+                "coordinateSystem": "geo",
+                "data": self.geo_data}]
+        }
+        geo_data_option.update(self.geo_map)
+        geo_data_option.update(create_visual_map(self.data, visual_type, dimension))
+        return Pancharts(graph_config=GEO_OPTION, data_config=geo_data_option, user_option=config)
+    
+    def graph(self, edges: list, config: dict | None = None):
+        if config is None:
+            config = {}
+        
+        edges_data = []
+        for i in edges:
+            edges_data.append({
+                'source': i[0],
+                'target': i[1]
+            })
+      
+        geo_data_option = {
+            "series": [{
+                "nodes": self.geo_data,
+                "edges": edges_data
+            }]
+        }
+        geo_data_option.update(self.geo_map)
+        return Pancharts(graph_config=GEO_GRAPH_OPTION, data_config=geo_data_option, user_option=config)
+    
+    def bar3d(self, dimension: int | list = 2, visual_type: str | list = "color", config: dict | None = None):
+        if config is None:
+            config = {}
+        
+        geo_data_option = {
+            "series": [{
+                "data": self.geo_data
+            }]
+        }
+        geo_data_option.update(self.geo3d_map)
+        geo_data_option.update(create_visual_map(self.data, visual_type, dimension))
+        return Pancharts(graph_config=GEO3D_BAR3D_OPTION, data_config=geo_data_option, user_option=config)
+    
+    def line3d(self, coords: list, config: dict | None = None):
+        if config is None:
+            config = {}
+        
+        coords_data = []
+        for i in coords:
+            coords_data.append({
+                'coords': [self.data.loc[i[0]].tolist()[0:2], self.data.loc[i[1]].tolist()[0:2]]
+            })
+      
+        geo_data_option = {
+            "series": [{
+                "data": coords_data
+            }]
+        }
+        geo_data_option.update(self.geo3d_map)
+        return Pancharts(graph_config=GEO3D_LINES3D_OPTION, data_config=geo_data_option, user_option=config)
+    
