@@ -18,12 +18,23 @@ NODE_MODULES_PATH = None
 # https://echarts.apache.org/zh/theme-builder.html
 GLOBAL_DEFAULT_CONFIG = {
     "init": {
-        "echarts_source": "online",
+        "echarts_source": "local",
         "width": "60%",
         "height": "400px",
         "renderer": "canvas",
         "theme": ""
+    },
+  "color": ["#d87c7c", "#919e8b", "#d7ab82", "#6e7074", "#61a0a8", "#efa18d", "#787464", "#cc7e63", "#724e58", "#4b565b"],
+  "backgroundColor": "#fef8ef",
+  "textStyle": {},
+  "title": {
+    "textStyle": {
+      "color": "#333"
+    },
+    "subtextStyle": {
+      "color": "#aaa"
     }
+  },
 }
 
 # 柱状图配置
@@ -192,4 +203,141 @@ MAP_OPTION = {
             "zoom": 1
         }
     ]
+}
+
+MAP3D_OPTION = {
+    "tooltip": {"trigger": "item"},
+    "legend": {},
+    "visualMap": {
+        "type": "continuous",
+        "calculable": True,
+        "inRange": {
+            "color": ['#e0f3f8', '#abd9e9', '#74add1', '#4575b4', '#313695']
+        },
+        "textStyle": {"color": "#333"}
+    },
+    "series": [
+        {
+            "type": "map3d",
+            "name": "数据",
+            "label": {"show": True, "margin": 8},
+            "roam": True,
+            "aspectScale": 0.75,
+            "zoom": 1,
+            "groundPlane": {
+                "show": True,
+                "color": '#081027',
+                "borderColor": '#2f5597',
+                "borderWidth": 1
+            },
+            "shading": 'lambert',
+            "boxHeight": 8,
+            "itemStyle": {
+                "color": '#152949',
+                "borderColor": '#2f5597',
+                "borderWidth": 1
+            }
+
+        }
+    ]
+}
+
+
+#geo地理坐标配置
+GEO_OPTION = {
+    "title": {
+        "left": "center"
+    },
+    "tooltip": {
+        "trigger": "item",
+        'formatter': "JsCode:function(params) { return params.name + '<br/>values:' + params.value; }"
+    },
+    "geo": {
+        "roam": True,
+    },
+}
+
+GEO_GRAPH_OPTION = {
+    "title": {
+        "left": "center"
+    },
+    "tooltip": {
+        "trigger": "item",
+        'formatter': "JsCode:function(params) { return params.name + '<br/>values:' + params.value; }"
+    },
+    "geo": {
+        "roam": True,
+    },
+    "series": [{
+        "type": "graph",
+        "coordinateSystem": "geo",
+        "edgeSymbol": ['none', 'arrow'],
+        "edgeSymbolSize": 5,
+        "lineStyle": {
+            "color": '#718adbff',
+            "opacity": 1
+        }
+    }]
+}
+
+
+#geo3d地理坐标配置
+GEO3D_BAR3D_OPTION = {
+    "backgroundColor": '#081027',
+    "title": {
+        "left": "center"
+    },
+    "tooltip": {
+        "trigger": "item",
+        'formatter': "JsCode:function(params) { return params.name + '<br/>values:' + params.value; }"
+    },
+    "geo3D": {
+        "shading": 'lambert',
+        "boxHeight": 8,
+        "itemStyle": {
+            "color": '#152949',
+            "borderColor": '#2f5597',
+            "borderWidth": 1
+        }
+    },
+    "series": [{
+        "type": "bar3D",
+        "coordinateSystem": "geo3D"
+    }]
+}
+
+GEO3D_LINES3D_OPTION = {
+    "backgroundColor": '#081027',
+    "title": {
+        "left": "center"
+    },
+    "tooltip": {
+        "trigger": "item",
+        'formatter': "JsCode:function(params) { return params.name + '<br/>values:' + params.value; }"
+    },
+    "geo3D": {
+        "shading": 'lambert',
+        "boxHeight": 8,
+        "itemStyle": {
+            "color": '#152949',
+            "borderColor": '#2f5597',
+            "borderWidth": 1
+        }
+    },
+    "series": [{
+        "type": "lines3D",
+        "coordinateSystem": "geo3D",
+        "effect": {
+            "show": True,
+            "trailWidth": 1.5,
+            "trailOpacity": 0.5,
+            "trailLength": 0.2,
+            "constantSpeed": 5
+        },
+        "blendMode": "lighter",
+        "lineStyle": {
+            "width": 1.5,
+            "opacity": 0.25
+        }
+    }]
 }
