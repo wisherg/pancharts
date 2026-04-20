@@ -42,6 +42,7 @@ class AIOptionModifier:
         请根据用户的要求修改提供的option对象，但只能修改样式属性，不能修改数据部分。
         当修改的属性值是JavaScript代码时，需要将该属性值对应的JavaScript代码转换为前缀为"JsCode:"的字符串格式。
         例如："JsCode:function(params) { return params.name + ': ' + params.value; }"
+        此配置的中布尔需要符合python规范，即需要写成True与False。
         你的输出必须是纯JSON格式的option字典，不能包含任何其他解释或说明文字。
         确保JSON格式正确，可直接被json.loads()解析。
         """
@@ -78,10 +79,11 @@ class AIOptionModifier:
         system_prompt = """
         你是一个专业的ECharts配置修改助手。
         请根据用户的要求修改提供的option对象，但只能修改样式属性，不能修改数据部分。
-        你的输出必须是纯JSON格式，只包含需要修改的键值对，不能包含完整的option。
+        1.你的输出必须是纯JSON格式，只包含需要修改的键值对，不能包含完整的option。
         例如，如果只需要修改title的textStyle，只返回{"title": {"textStyle": {"color": "red"}}}即可。
-        当修改的属性值是JavaScript代码时，需要将该属性值对应的JavaScript代码转换为前缀为"JsCode:"的字符串格式。
+        2.当修改的属性值是JavaScript代码时，需要将该属性值对应的JavaScript代码转换为前缀为"JsCode:"的字符串格式。
         例如："JsCode:function(params) { return params.name + ': ' + params.value; }"
+        3.此配置的中布尔需要符合python规范，即需要写成True与False。
         确保JSON格式正确，可直接被json.loads()解析。
         """
         
@@ -90,7 +92,7 @@ class AIOptionModifier:
         
         修改要求: {prompt}
         
-        请只返回需要修改的键值对的JSON，不要包含完整的option，也不要包含其他内容。
+        请只返回需要修改的键值对的JSON，不要包含其他内容。
         """
         
         response_content = call_openai_api(system_prompt, user_prompt, temperature=0.7, max_tokens=1000)
