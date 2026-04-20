@@ -193,3 +193,112 @@ def load_countries_info():
     import os
     file_path = os.path.join(os.path.dirname(__file__), 'datasets', 'countries_info.csv')
     return pd.read_csv(file_path)
+
+
+def create_visual_map(dataframe, map_types, columns):
+    """
+    生成ECharts的visualMap映射配置
+    
+    参数:
+        dataframe: pd.DataFrame - 输入的数据框
+        map_types: str | List[str] - 映射类型，可选值为 "color", "opacity", "symbolSize", "symbol", "lightness", "saturation"
+        columns: int | List[int] - 映射的数据框列索引（基于顺序索引），可以是一列或多列
+        
+    返回:
+        List[dict] - visualMap配置列表，每个元素对应一个visualMap配置
+        
+    说明:
+        - map_types与columns一一对应，第i个列使用第i个映射类型
+        - 使用get_value_type判断对应列的类型
+        - 如果映射列为value类型，进行连续映射
+        - 如果为category类型，使用枚举型映射
+        - inRange中的范围会自动设定
+        - 如果是枚举型，通过random_color_list生成随机颜色列表
+    """
+    if isinstance(map_types, str):
+        map_types = [map_types]
+    if isinstance(columns, int):
+        columns = [columns]
+    
+    if len(map_types) != len(columns):
+        raise ValueError("map_types和columns的长度必须相等")
+    
+    visual_maps = []
+    
+    for i, col_idx in enumerate(columns):
+        if col_idx < 0 or col_idx >= len(dataframe.columns):
+            raise ValueError(f"列索引 {col_idx} 超出数据框范围")
+        
+        map_type = map_types[i]
+        col_name = dataframe.columns[col_idx]
+        col_data = dataframe[col_name]
+        value_type = get_value_type(col_data)
+        
+        visual_map = {
+            "type": "continuous" if value_type == "value" else "piecewise",
+            "dimension": col_idx
+        }
+        
+        if value_type == "value":
+            visual_map["min"] = float(col_data.min())
+            visual_map["max"] = float(col_data.max())
+        
+        in_range = {}
+        if map_type == "color":
+            if value_type == "value":
+                in_range["color"] = ["#50a3ba", "#eac736", "#d94e5d"]
+            else:
+                unique_vals = col_data.unique().tolist()
+                in_range["color"] = random_color_list(len(unique_vals))
+        
+        elif map_type == "opacity":
+            if value_type == "value":
+                in_range["opacity"] = [0.1, 1.0]
+            else:
+                unique_vals = col_data.unique().tolist()
+                in_range["opacity"] = [0.3 + j * 0.7 / len(unique_vals) for j in range(len(unique_vals))]
+        
+        elif map_type == "symbolSize":
+            if value_type == "value":
+                in_range["symbolSize"] = [10, 30]
+            else:
+                unique_vals = col_data.unique().tolist()
+                in_range["symbolSize"] = [10 + j * 5 for j in range(len(unique_vals))]
+        
+        elif map_type == "symbol":
+            symbols = ["circle", "rect", "roundRect", "triangle", "diamond", "pin", "arrow", "none"]
+            if value_type == "value":
+                in_range["symbol"] = [symbols[0], symbols[-2]]
+            else:
+                unique_vals = col_data.unique().tolist()
+                in_range["symbol"] = [symbols[j % len(symbols)] for j in range(len(unique_vals))]
+        
+        elif map_type == "lightness":
+            if value_type == "value":
+                in_range["lightness"] = [0.2, 0.8]
+            else:
+                unique_vals = col_data.unique().tolist()
+                in_range["lightness"] = [0.3 + j * 0.5 / len(unique_vals) for j in range(len(unique_vals))]
+        
+        elif map_type == "saturation":
+            if value_type == "value":
+                in_range["saturation"] = [0.2, 0.8]
+            else:
+                unique_vals = col_data.unique().tolist()
+                in_range["saturation"] = [0.3 + j * 0.5 / len(unique_vals) for j in range(len(unique_vals))]
+        
+        else:
+            raise ValueError(f"不支持的映射类型: {map_type}")
+        
+        visual_map["inRange"] = in_range
+        
+        if value_type == "category":
+            unique_vals = col_data.unique().tolist()
+            visual_map["pieces"] = [{"value": val} for val in unique_vals]
+        
+        if i > 0:
+            visual_map["show"] = False
+        
+        visual_maps.append(visual_map)
+    
+    return {"visualMap": visual_maps}
