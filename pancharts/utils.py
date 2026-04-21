@@ -302,3 +302,140 @@ def create_visual_map(dataframe, map_types, columns):
         visual_maps.append(visual_map)
     
     return {"visualMap": visual_maps}
+
+
+
+
+def geocode_amap(address: str, api_key: str = None) -> tuple:
+    """
+    使用高德地图API进行地理编码，将地址转换为经纬度
+    
+    参数:
+        address: str - 要编码的地址
+        api_key: str, optional - 高德地图API key，默认为None时使用配置文件中的key
+        
+    返回:
+        tuple - (经度, 纬度)，如果失败返回(None, None)
+        
+    示例:
+        >>> geocode_amap("北京市朝阳区望京SOHO")
+        (116.47366, 39.99924)
+    """
+    import requests
+    
+    from .chart_config import AMAP_API_KEY
+    
+    key = api_key if api_key else AMAP_API_KEY
+    
+    if not key:
+        raise ValueError("请在chart_config.py中配置AMAP_API_KEY，或在调用时传入api_key参数")
+    
+    url = "https://restapi.amap.com/v3/geocode/geo"
+    params = {
+        "address": address,
+        "key": key,
+        "output": "json"
+    }
+    
+    try:
+        response = requests.get(url, params=params)
+        response.raise_for_status()
+        result = response.json()
+        
+        if result.get("status") == "1" and result.get("geocodes"):
+            location = result["geocodes"][0]["location"]
+            lng, lat = map(float, location.split(","))
+            return (lng, lat)
+        else:
+            return (None, None)
+    except Exception as e:
+        return (None, None)
+
+
+def geocode_opencage(address: str, api_key: str = None) -> tuple:
+    """
+    使用OpenCage API进行地理编码，将地址转换为经纬度
+    
+    参数:
+        address: str - 要编码的地址
+        api_key: str, optional - OpenCage API key，默认为None时使用配置文件中的key
+        
+    返回:
+        tuple - (经度, 纬度)，如果失败返回(None, None)
+        
+    示例:
+        >>> geocode_opencage("Beijing, China")
+        (116.397229, 39.9075)
+    """
+    import requests
+    
+    from .chart_config import OPENCAGE_API_KEY
+    
+    key = api_key if api_key else OPENCAGE_API_KEY
+    
+    if not key:
+        raise ValueError("请在chart_config.py中配置OPENCAGE_API_KEY，或在调用时传入api_key参数")
+    
+    url = "https://api.opencagedata.com/geocode/v1/json"
+    params = {
+        "q": address,
+        "key": key
+    }
+    
+    try:
+        response = requests.get(url, params=params)
+        response.raise_for_status()
+        result = response.json()
+        
+        if result.get("results"):
+            geometry = result["results"][0]["geometry"]
+            return (geometry["lng"], geometry["lat"])
+        else:
+            return (None, None)
+    except Exception as e:
+        return (None, None)
+
+
+def geocode_baidu(address: str, api_key: str = None) -> tuple:
+    """
+    使用百度地图API进行地理编码，将地址转换为经纬度
+    
+    参数:
+        address: str - 要编码的地址
+        api_key: str, optional - 百度地图API key，默认为None时使用配置文件中的key
+        
+    返回:
+        tuple - (经度, 纬度)，如果失败返回(None, None)
+        
+    示例:
+        >>> geocode_baidu("北京市朝阳区望京SOHO")
+        (116.47366, 39.99924)
+    """
+    import requests
+    
+    from .chart_config import BAIDU_API_KEY
+    
+    key = api_key if api_key else BAIDU_API_KEY
+    
+    if not key:
+        raise ValueError("请在chart_config.py中配置BAIDU_API_KEY，或在调用时传入api_key参数")
+    
+    url = "https://api.map.baidu.com/geocoding/v3"
+    params = {
+        "address": address,
+        "output": "json",
+        "ak": key
+    }
+    
+    try:
+        response = requests.get(url, params=params)
+        response.raise_for_status()
+        result = response.json()
+        
+        if result.get("status") == 0 and result.get("result"):
+            location = result["result"]["location"]
+            return (location["lng"], location["lat"])
+        else:
+            return (None, None)
+    except Exception as e:
+        return (None, None)
