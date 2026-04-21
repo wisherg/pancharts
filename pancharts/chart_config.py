@@ -11,6 +11,15 @@ DEFAULT_AI_API_KEY = ""
 DEFAULT_AI_BASE_URL = ""
 DEFAULT_AI_MODEL_NAME = ""
 
+# 高德地图API配置
+AMAP_API_KEY = ""
+
+# OpenCage API配置
+OPENCAGE_API_KEY = ""
+
+# 百度地图API配置
+BAIDU_API_KEY = ""
+
 # node_modules文件夹的绝对地址,通过设置此路径使用本地的echarts库
 NODE_MODULES_PATH = None
 
