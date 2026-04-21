@@ -46,7 +46,7 @@ from .chart_config import (
     GEO3D_LINES3D_OPTION
 )
 
-__version__ = "0.1.4"
+__version__ = "0.1.4.1"
 __author__ = "wang peng"
 __email__ = "wangpeng_621@163.com"
 
