@@ -645,7 +645,48 @@ class k_vm:
 
 class gk_vm:
     """
-    用于可视化pandas中的表示地理数据的单列索引、多列数值型数据的DataFrame,单列索引为地理位置名称，多列默认前两列为经纬度。
+    地理数据可视化类，用于可视化pandas中表示地理信息的数据。
+    
+    主要功能：
+        - 支持基于地理坐标的数据可视化
+        - 自动将DataFrame转换为ECharts地理图表可接受的数据格式
+        - 支持多种地理图表类型，包括2D和3D图表
+        - 支持数据可视化映射（颜色、大小等）
+    
+    数据格式要求：
+        - DataFrame的索引为地理位置名称
+        - 默认前两列数据为经纬度（longitude, latitude）
+        - 后续列可以是其他数值型数据，用于可视化映射
+    
+    支持的图表类型：
+        - scatter: 地理散点图
+        - escatter: 地理特效散点图
+        - heatmap: 地理热力图
+        - graph: 地理关系图（节点-边）
+        - bar3d: 3D柱状图（基于geo3D）
+        - line3d: 3D飞线图（基于geo3D）
+    
+    参数：
+        data: pandas DataFrame - 地理数据，索引为位置名称，前两列为经纬度
+        map_type: str - 地图类型，如"china"、"world"等
+    
+    用法示例：
+        from pancharts import gk_vm
+        import pandas as pd
+        
+        # 创建地理数据（索引为城市名，前两列为经纬度）
+        data = pd.DataFrame({
+            'lng': [116.4074, 121.4737, 104.0668],
+            'lat': [39.9042, 31.2304, 30.5728],
+            'value': [100, 200, 150]
+        }, index=['北京', '上海', '成都'])
+        
+        # 创建地理可视化实例
+        geo_chart = gk_vm(data, map_type='china')
+        
+        # 绘制散点图
+        chart = geo_chart.scatter(dimension=2, visual_type='color')
+        chart.render()
     """
     def __init__(self,data,map_type:str):
         self.data = data
