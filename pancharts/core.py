@@ -560,3 +560,119 @@ class Pancharts:
         # 返回HTML内容，与pyecharts兼容，直接显示在Jupyter Notebook中
         from IPython.display import HTML
         return HTML(html_content)
+        
+    def to_pyecharts(self):
+        """
+        将Pancharts配置转换为pyecharts的Chart实例
+        
+        返回：
+            pyecharts.charts.chart.Chart - pyecharts的Chart实例，已设置好option
+            
+        说明：
+            1. 自动移除pancharts特有的init配置键
+            2. 将pancharts的"JsCode:..."字符串格式转换为pyecharts的JsCode类
+            3. 递归处理所有嵌套的JsCode标记
+            
+        示例：
+            from pancharts import Pancharts
+            chart = Pancharts(option={...})
+            pe_chart = chart.to_pyecharts()
+            pe_chart.render("output.html")
+        """
+        import copy
+        
+        # 获取合并后的option
+        merged_option = self.option
+        
+        # 深拷贝以避免修改原始数据
+        option_for_pyecharts = copy.deepcopy(merged_option)
+        
+        # 移除pancharts特有的init配置
+        if "init" in option_for_pyecharts:
+            del option_for_pyecharts["init"]
+        
+        # 递归处理JsCode标记，转换为pyecharts的JsCode类
+        def convert_jscode(obj):
+            if isinstance(obj, dict):
+                return {k: convert_jscode(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [convert_jscode(item) for item in obj]
+            elif isinstance(obj, str) and obj.startswith("JsCode:"):
+                # 转换为pyecharts的JsCode类
+                from pyecharts.utils import JsCode
+                return JsCode(obj[7:])  # 去掉"JsCode:"前缀
+            else:
+                return obj
+        
+        # 转换option中的JsCode标记
+        option_for_pyecharts = convert_jscode(option_for_pyecharts)
+        
+        # 创建pyecharts的Chart实例
+        from pyecharts.charts.chart import Chart
+        pe_chart = Chart()
+        pe_chart.set_global_opts()
+        pe_chart.options = option_for_pyecharts
+        
+        return pe_chart
+    
+    def to_nicegui(self):
+        """
+        将Pancharts配置转换为nicegui兼容的ECharts配置字典
+        
+        返回：
+            dict - 符合nicegui要求的ECharts配置字典
+            
+        说明：
+            1. 自动移除pancharts特有的init配置键
+            2. 将pancharts的"JsCode:..."字符串格式转换为nicegui的":property"格式
+               nicegui中使用冒号前缀表示该属性值为JavaScript表达式
+            3. 递归处理所有嵌套的JsCode标记
+            
+        nicegui的JsCode处理方式：
+            使用冒号":"前缀属性名来表示值是JavaScript表达式
+            例如: ':formatter': r'(val, idx) => `group ${val}`'
+            
+        示例：
+            from pancharts import Pancharts
+            from nicegui import ui
+            
+            chart = Pancharts(option={...})
+            config = chart.to_nicegui()
+            
+            ui.echart(config).classes('w-full h-96')
+            ui.run()
+        """
+        import copy
+        
+        # 获取合并后的option
+        merged_option = self.option
+        
+        # 深拷贝以避免修改原始数据
+        option_for_nicegui = copy.deepcopy(merged_option)
+        
+        # 移除pancharts特有的init配置
+        if "init" in option_for_nicegui:
+            del option_for_nicegui["init"]
+        
+        # 递归处理JsCode标记，转换为nicegui的":property"格式
+        def convert_jscode(obj):
+            if isinstance(obj, dict):
+                result = {}
+                for k, v in obj.items():
+                    # 检查值是否为JsCode标记
+                    if isinstance(v, str) and v.startswith("JsCode:"):
+                        # 使用冒号前缀表示JavaScript表达式
+                        result[f":{k}"] = v[7:]  # 去掉"JsCode:"前缀
+                    else:
+                        result[k] = convert_jscode(v)
+                return result
+            elif isinstance(obj, list):
+                return [convert_jscode(item) for item in obj]
+            else:
+                return obj
+        
+        # 转换option中的JsCode标记
+        option_for_nicegui = convert_jscode(option_for_nicegui)
+        
+        return option_for_nicegui
+
