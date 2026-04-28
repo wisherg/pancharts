@@ -1,4 +1,10 @@
 
+<!-- 引入高德地图相关文件（必须在前面加载） -->
+{% if is_amap_chart %}
+<script type="text/javascript" src="{{ amap_js_path }}"></script>
+<script type="text/javascript" src="{{ amap_map_js_path }}"></script>
+{% endif %}
+
 <script>
     require.config({
         paths: {
@@ -17,5 +23,14 @@
                     document.getElementById('{{ chart_id }}'), '{{ theme }}', {renderer: '{{ renderer }}', locale: 'ZH'});
                 var option_{{ chart_id }} = {{ option|safe }};
                 chart_{{ chart_id }}.setOption(option_{{ chart_id }});
+                
+                // 高德地图扩展组件初始化（仅在使用高德地图时执行）
+                {% if is_amap_chart %}
+                var amapComponent = chart_{{ chart_id }}.getModel().getComponent('amap');
+                var amap = amapComponent.getAMap();
+                amap.addControl(new AMap.Scale());
+                amap.addControl(new AMap.ToolBar());
+                amapComponent.setEChartsLayerInteractive(true);
+                {% endif %}
         });
     </script>
