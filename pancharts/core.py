@@ -74,6 +74,8 @@ class Pancharts:
         self.is_map_chart = False
         self.map_name = "china"
         self.echarts_map_name = "china"
+        # 高德地图相关属性
+        self.is_amap_chart = False
     
     @property
     def option(self):
@@ -301,21 +303,29 @@ class Pancharts:
         self.is_map_chart = False
         self.map_name = "china"  # 默认地图名称
         self.echarts_map_name = "china"  # ECharts使用的实际地图名称
+        # 检测是否为高德地图图表
+        self.is_amap_chart = False
         
-        # 先检查是否有geo组件
-        if merged_option.get("geo"):
-            geo_option = merged_option.get("geo")
-            if isinstance(geo_option, dict) and geo_option.get("map"):
-                self.is_map_chart = True
-                self.map_name = geo_option.get("map", "china")
+        # 检查是否有amap组件（高德地图）
+        if merged_option.get("amap"):
+            self.is_amap_chart = True
         
-        # 再检查是否有map系列，如果有，会覆盖geo组件的地图名称
-        if merged_option.get("series") and not self.is_map_chart:
-            for series in merged_option.get("series", []):
-                if isinstance(series, dict) and series.get("type") == "map":
+        # 如果不是高德地图，再检查普通地图
+        if not self.is_amap_chart:
+            # 先检查是否有geo组件
+            if merged_option.get("geo"):
+                geo_option = merged_option.get("geo")
+                if isinstance(geo_option, dict) and geo_option.get("map"):
                     self.is_map_chart = True
-                    self.map_name = series.get("map", "china")
-                    break
+                    self.map_name = geo_option.get("map", "china")
+            
+            # 再检查是否有map系列，如果有，会覆盖geo组件的地图名称
+            if merged_option.get("series") and not self.is_map_chart:
+                for series in merged_option.get("series", []):
+                    if isinstance(series, dict) and series.get("type") == "map":
+                        self.is_map_chart = True
+                        self.map_name = series.get("map", "china")
+                        break
         
         # 检查是否有反向映射（英文名称到中文名称）
         if self.is_map_chart:
@@ -372,9 +382,15 @@ class Pancharts:
             echarts_gl_js_path = "https://assets.pyecharts.org/assets/v5/echarts-gl.min.js"
             echarts_wordcloud_js_path = "https://assets.pyecharts.org/assets/v5/echarts-wordcloud.min.js"
         
-        # 判断是否需要引入echarts-gl（用于3D图表）
+        # 判断是否需要引入echarts-gl（用于3D图表和Globe）
         use_echarts_gl = False
-        if merged_option.get("series"):
+        
+        # 检查是否有globe组件（需要echarts-gl）
+        if merged_option.get("globe"):
+            use_echarts_gl = True
+        
+        # 检查series类型
+        if not use_echarts_gl and merged_option.get("series"):
             for series in merged_option.get("series", []):
                 if isinstance(series, dict):
                     series_type = series.get("type")
@@ -431,6 +447,10 @@ class Pancharts:
         if isinstance(rendered_option, dict) and "init" in rendered_option:
             del rendered_option["init"]
         
+        # 如果是高德地图图表，移除backgroundColor以避免覆盖地图
+        if self.is_amap_chart and isinstance(rendered_option, dict) and "backgroundColor" in rendered_option:
+            del rendered_option["backgroundColor"]
+        
         # 递归处理rendered_option中的非JSON可序列化对象
         def recursive_serialize(obj):
             """递归序列化对象"""
@@ -462,6 +482,11 @@ class Pancharts:
         # 处理JSON字符串中的__jscode__标记，将其转换为实际的JavaScript代码
         rendered_option = self._process_jscode_in_json(rendered_option)
         
+        # 高德地图相关配置
+        from .chart_config import AMAP_MAP_API_KEY
+        amap_js_path = "https://assets.pyecharts.org/assets/v5/echarts-extension-amap.min.js"
+        amap_map_js_path = f"https://webapi.amap.com/maps?v=2.0&key={AMAP_MAP_API_KEY}&plugin=AMap.Scale,AMap.ToolBar"
+        
         return {
             "echarts_js_path": echarts_js_path,
             "echarts_gl_js_path": echarts_gl_js_path,
@@ -469,7 +494,11 @@ class Pancharts:
             "echarts_wordcloud_js_path": echarts_wordcloud_js_path,
             "use_echarts_wordcloud": use_echarts_wordcloud,
             "map_url": map_url,
-            "rendered_option": rendered_option
+            "rendered_option": rendered_option,
+            # 高德地图相关
+            "is_amap_chart": self.is_amap_chart,
+            "amap_js_path": amap_js_path,
+            "amap_map_js_path": amap_map_js_path
         }
     
     def render(self, filename="index.html", output_dir="."):
@@ -512,7 +541,11 @@ class Pancharts:
             theme=self._theme,
             is_map_chart=self.is_map_chart,
             map_name=self.map_name if self.is_map_chart else "",
-            map_url=render_data["map_url"]
+            map_url=render_data["map_url"],
+            # 高德地图相关
+            is_amap_chart=render_data["is_amap_chart"],
+            amap_js_path=render_data["amap_js_path"],
+            amap_map_js_path=render_data["amap_map_js_path"]
         )
         
         # 保存生成的HTML文件
@@ -554,13 +587,17 @@ class Pancharts:
             renderer=self._renderer,
             theme=self._theme,
             map_url=render_data["map_url"],
-            map_name=self.map_name  # 添加map_name参数，用于模板中生成正确的地图引用
+            map_name=self.map_name,
+            # 高德地图相关
+            is_amap_chart=render_data["is_amap_chart"],
+            amap_js_path=render_data["amap_js_path"],
+            amap_map_js_path=render_data["amap_map_js_path"]
         )
         
         # 返回HTML内容，与pyecharts兼容，直接显示在Jupyter Notebook中
         from IPython.display import HTML
         return HTML(html_content)
-        
+    
     def to_pyecharts(self):
         """
         将Pancharts配置转换为pyecharts的Chart实例
@@ -675,4 +712,3 @@ class Pancharts:
         option_for_nicegui = convert_jscode(option_for_nicegui)
         
         return option_for_nicegui
-
