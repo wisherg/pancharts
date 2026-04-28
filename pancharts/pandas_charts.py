@@ -6,6 +6,8 @@ Pancharts pandas可视化模块
 包含基于pandas的数据可视化类
 """
 
+import pandas as pd
+
 from pancharts.chart_config import (
     BAR_OPTION,
     LINE_OPTION,
@@ -29,7 +31,15 @@ from pancharts.chart_config import (
     GEO_OPTION,
     GEO_GRAPH_OPTION,
     GEO3D_BAR3D_OPTION,
-    GEO3D_LINES3D_OPTION
+    GEO3D_LINES3D_OPTION,
+    AMAP_OPTION,
+    AMAP_HEATMAP_OPTION,
+    AMAP_GRAPH_OPTION,
+    AMAP_LINES_OPTION,
+    GLOBE_SCATTER_OPTION,
+    GLOBE_BAR3D_OPTION,
+    GLOBE_LINES3D_OPTION,
+    KLINE_OPTION
 )
 from pancharts.utils import get_index_type, get_value_type, random_color, deep_merge, create_visual_map
 from pancharts.core import Pancharts
@@ -787,4 +797,486 @@ class gk_vm:
         }
         geo_data_option.update(self.geo3d_map)
         return Pancharts(graph_config=GEO3D_LINES3D_OPTION, data_config=geo_data_option, user_option=config)
+
+
+class gk_vm_amap:
+    """
+    高德地图地理数据可视化类，用于通过高德地图API进行地理信息可视化。
+    
+    主要功能：
+        - 支持基于高德地图的地理坐标数据可视化
+        - 自动通过高德地图API获取地图中心点
+        - 支持多种地理图表类型
+        - 支持数据可视化映射（颜色、大小等）
+    
+    数据格式要求：
+        - DataFrame的索引为地理位置名称
+        - 默认前两列数据为经纬度（longitude, latitude）
+        - 后续列可以是其他数值型数据，用于可视化映射
+    
+    支持的图表类型：
+        - scatter: 散点图
+        - effectScatter: 涟漪高亮散点图
+        - heatmap: 热力图
+        - graph: 关系网络图
+        - lines: 飞线图/迁徙图
+    
+    参数：
+        data: pandas DataFrame - 地理数据，索引为位置名称，前两列为经纬度
+        map_type: str - 地址名称，用于获取地图中心点（如"北京市"、"上海市"等）
+    
+    用法示例：
+        from pancharts import gk_vm_amap
+        import pandas as pd
+        
+        # 创建地理数据（索引为城市名，前两列为经纬度）
+        data = pd.DataFrame({
+            'lng': [116.4074, 121.4737, 104.0668],
+            'lat': [39.9042, 31.2304, 30.5728],
+            'value': [100, 200, 150]
+        }, index=['北京', '上海', '成都'])
+        
+        # 创建高德地图可视化实例（以"北京市"为中心）
+        amap_chart = gk_vm_amap(data, map_type='北京市')
+        
+        # 绘制散点图
+        chart = amap_chart.scatter(dimension=2, visual_type='color')
+        chart.render()
+    """
+    
+    def __init__(self, data, map_type: str = None):
+        """
+        初始化gk_vm_amap实例
+        
+        参数：
+            data: pandas DataFrame - 地理数据，索引为位置名称，前两列为经纬度
+            map_type: str, optional - 地址名称，用于获取地图中心点。默认为None，此时使用数据的平均经纬度作为中心
+        """
+        from pancharts.utils import geocode_amap
+        
+        self.data = data
+        self.map_type = map_type
+        
+        # 构建地理数据格式
+        self.geo_data = []
+        for i in self.data.iterrows():
+            self.geo_data.append({
+                'name': i[0],
+                'value': i[1].tolist()
+            })
+        
+        # 计算数据的平均经纬度作为默认中心
+        avg_lng = self.data.iloc[:, 0].mean()
+        avg_lat = self.data.iloc[:, 1].mean()
+        self.center = (avg_lng, avg_lat)
+        
+        # 如果提供了map_type，尝试通过高德地图API获取地图中心点
+        if map_type:
+            api_center = geocode_amap(map_type)
+            if api_center != (None, None):
+                self.center = api_center
+        
+        # 构建amap配置
+        self.amap_map = {
+            "amap": {
+                "center": list(self.center),
+                "viewMode": "3D",
+                "resizeEnable": True,
+                "renderOnMoving": True,
+                "echartsLayerInteractive": True
+            }
+        }
+    
+    def scatter(self, dimension: int | list = 2, visual_type: str | list = "color", config: dict | None = {}):
+        """
+        创建高德地图散点图
+        
+        参数：
+            dimension: int | list - 要映射的列索引，默认为第2列（索引从0开始）
+            visual_type: str | list - 映射类型，可选值为 "color", "opacity", "symbolSize" 等
+            config: dict - 额外的配置项
+        
+        返回：
+            Pancharts - 图表实例
+        """
+        if config is None:
+            config = {}
+        
+        amap_data_option = {
+            "series": [{
+                "type": "scatter",
+                "coordinateSystem": "amap",
+                "data": self.geo_data
+            }]
+        }
+        amap_data_option.update(self.amap_map)
+        amap_data_option.update(create_visual_map(self.data, visual_type, dimension))
+        return Pancharts(graph_config=AMAP_OPTION, data_config=amap_data_option, user_option=config)
+    
+    def escatter(self, dimension: int | list = 2, visual_type: str | list = "color", config: dict | None = {}):
+        """
+        创建高德地图涟漪高亮散点图
+        
+        参数：
+            dimension: int | list - 要映射的列索引，默认为第2列（索引从0开始）
+            visual_type: str | list - 映射类型，可选值为 "color", "opacity", "symbolSize" 等
+            config: dict - 额外的配置项
+        
+        返回：
+            Pancharts - 图表实例
+        """
+        if config is None:
+            config = {}
+        
+        amap_data_option = {
+            "series": [{
+                "type": "effectScatter",
+                "coordinateSystem": "amap",
+                "data": self.geo_data,
+                "effect": {
+                    "show": True,
+                    "scale": 2,
+                    "period": 3
+                }
+            }]
+        }
+        amap_data_option.update(self.amap_map)
+        amap_data_option.update(create_visual_map(self.data, visual_type, dimension))
+        return Pancharts(graph_config=AMAP_OPTION, data_config=amap_data_option, user_option=config)
+    
+    def heatmap(self, dimension: int | list = 2, visual_type: str | list = "color", config: dict | None = {}):
+        """
+        创建高德地图热力图
+        
+        参数：
+            dimension: int | list - 要映射的列索引，默认为第2列（索引从0开始）
+            visual_type: str | list - 映射类型，可选值为 "color", "opacity", "symbolSize" 等
+            config: dict - 额外的配置项
+        
+        返回：
+            Pancharts - 图表实例
+        """
+        if config is None:
+            config = {}
+        
+        amap_data_option = {
+            "series": [{
+                "type": "heatmap",
+                "coordinateSystem": "amap",
+                "data": self.geo_data
+            }]
+        }
+        amap_data_option.update(self.amap_map)
+        amap_data_option.update(create_visual_map(self.data, visual_type, dimension))
+        return Pancharts(graph_config=AMAP_HEATMAP_OPTION, data_config=amap_data_option, user_option=config)
+    
+    def graph(self, edges: list, config: dict | None = None):
+        """
+        创建高德地图关系网络图
+        
+        参数：
+            edges: list - 边的列表，每个元素为(source, target)元组
+            config: dict - 额外的配置项
+        
+        返回：
+            Pancharts - 图表实例
+        """
+        if config is None:
+            config = {}
+        
+        edges_data = []
+        for i in edges:
+            edges_data.append({
+                'source': i[0],
+                'target': i[1]
+            })
+        
+        amap_data_option = {
+            "series": [{
+                "nodes": self.geo_data,
+                "edges": edges_data
+            }]
+        }
+        amap_data_option.update(self.amap_map)
+        return Pancharts(graph_config=AMAP_GRAPH_OPTION, data_config=amap_data_option, user_option=config)
+    
+    def lines(self, coords: list, config: dict | None = None):
+        """
+        创建高德地图飞线图/迁徙图
+        
+        参数：
+            coords: list - 飞线路径列表，每个元素为(start, end)元组，表示从start到end的飞线
+            config: dict - 额外的配置项
+        
+        返回：
+            Pancharts - 图表实例
+        """
+        if config is None:
+            config = {}
+        
+        coords_data = []
+        for i in coords:
+            coords_data.append({
+                'coords': [self.data.loc[i[0]].tolist()[0:2], self.data.loc[i[1]].tolist()[0:2]]
+            })
+        
+        amap_data_option = {
+            "series": [{
+                "data": coords_data
+            }]
+        }
+        amap_data_option.update(self.amap_map)
+        return Pancharts(graph_config=AMAP_LINES_OPTION, data_config=amap_data_option, user_option=config)
+
+
+class gk_vm_globe:
+    """
+    Globe 地球可视化类，用于在三维地球表面上进行数据可视化。
+    
+    主要功能：
+        - 支持基于ECharts Globe组件的全球地理数据可视化
+        - 提供多种地球渲染风格（基础、夜景、真实感、地形）
+        - 支持数据可视化映射（颜色、大小等）
+    
+    数据格式要求：
+        - DataFrame的索引为地理位置名称
+        - 前两列为经纬度（longitude, latitude）
+        - 后续列可以是其他数值型数据，用于可视化映射
+    
+    支持的globe类型：
+        - 'basic': 基础地球配置，使用lambert着色
+        - 'night': 带高度纹理和夜景图层的地球
+        - 'realistic': 真实感渲染地球，使用PBR材质
+        - 'terrain': 地形渲染地球，显示地形起伏
+    
+    支持的图表类型：
+        - scatter: 3D散点图
+        - bar3d: 3D柱状图
+        - lines3d: 3D飞线图/迁徙图
+    
+    参数：
+        data: pandas DataFrame - 地理数据，索引为位置名称，前两列为经纬度
+        globe_type: str, optional - 地球类型，可选值为 'basic', 'night', 'realistic', 'terrain'，默认为 'basic'
+    
+    用法示例：
+        from pancharts import gk_vm_globe
+        import pandas as pd
+        
+        # 创建地理数据（索引为城市名，前两列为经纬度）
+        data = pd.DataFrame({
+            'lng': [116.4074, 121.4737, 104.0668, -73.9857],
+            'lat': [39.9042, 31.2304, 30.5728, 40.7484],
+            'value': [100, 200, 150, 180]
+        }, index=['北京', '上海', '成都', '纽约'])
+        
+        # 创建Globe可视化实例（使用夜景模式）
+        globe_chart = gk_vm_globe(data, globe_type='night')
+        
+        # 绘制散点图
+        chart = globe_chart.scatter(dimension=2, visual_type='color')
+        chart.render()
+    """
+    
+    def __init__(self, data, globe_type: str = 'basic'):
+        """
+        初始化gk_vm_globe实例
+        
+        参数：
+            data: pandas DataFrame - 地理数据，索引为位置名称，前两列为经纬度
+            globe_type: str - 地球类型，可选值为 'basic', 'night', 'realistic', 'terrain'
+        """
+        self.data = data
+        self.globe_type = globe_type
+        
+        # 构建地理数据格式
+        # Globe的scatter3D数据格式为 [经度, 纬度, 数据值]
+        # visualMap使用第三个维度(数据值)进行映射
+        self.geo_data = []
+        for i in self.data.iterrows():
+            row_data = i[1].tolist()
+            self.geo_data.append({
+                'name': i[0],
+                'value': row_data[:3]
+            })
+        
+        # 根据globe_type设置对应的地球配置
+        self._setup_globe_config()
+    
+    def _setup_globe_config(self):
+        """根据globe_type设置地球配置"""
+        import copy
+        from pancharts.chart_config import (
+            GLOBE_BASIC_OPTION,
+            GLOBE_NIGHT_OPTION,
+            GLOBE_REALISTIC_OPTION,
+            GLOBE_TERRAIN_OPTION
+        )
+        
+        globe_configs = {
+            'basic': GLOBE_BASIC_OPTION,
+            'night': GLOBE_NIGHT_OPTION,
+            'realistic': GLOBE_REALISTIC_OPTION,
+            'terrain': GLOBE_TERRAIN_OPTION
+        }
+        
+        # 获取对应配置，如果类型不存在则使用basic
+        # 深拷贝配置以避免修改原始配置
+        self.globe_config = copy.deepcopy(globe_configs.get(self.globe_type, GLOBE_BASIC_OPTION))
+    
+    def scatter(self, dimension: int | list = 2, visual_type: str | list = "color", config: dict | None = {}):
+        """
+        创建Globe 3D散点图
+        
+        参数：
+            dimension: int | list - 要映射的列索引，默认为第2列（索引从0开始）
+            visual_type: str | list - 映射类型，可选值为 "color", "opacity", "symbolSize" 等
+            config: dict - 额外的配置项
+        
+        返回：
+            Pancharts - 图表实例
+        """
+        if config is None:
+            config = {}
+        
+        # 先合并基础globe配置和图表特有配置
+        globe_data_option = deep_merge(self.globe_config, GLOBE_SCATTER_OPTION)
+        
+        # 添加数据
+        globe_data_option["series"][0]["data"] = self.geo_data
+        
+        # 添加visualMap配置
+        globe_data_option.update(create_visual_map(self.data, visual_type, dimension))
+        
+        return Pancharts(graph_config={}, data_config=globe_data_option, user_option=config)
+    
+    def bar3d(self, dimension: int | list = 2, visual_type: str | list = "color", config: dict | None = {}):
+        """
+        创建Globe 3D柱状图
+        
+        参数：
+            dimension: int | list - 要映射的列索引，默认为第2列（索引从0开始）
+            visual_type: str | list - 映射类型，可选值为 "color", "opacity", "symbolSize" 等
+            config: dict - 额外的配置项
+        
+        返回：
+            Pancharts - 图表实例
+        """
+        if config is None:
+            config = {}
+        
+        # 先合并基础globe配置和图表特有配置
+        globe_data_option = deep_merge(self.globe_config, GLOBE_BAR3D_OPTION)
+        
+        # 添加数据
+        globe_data_option["series"][0]["data"] = self.geo_data
+        
+        # 添加visualMap配置
+        globe_data_option.update(create_visual_map(self.data, visual_type, dimension))
+        
+        return Pancharts(graph_config={}, data_config=globe_data_option, user_option=config)
+    
+    def lines3d(self, coords: list, config: dict | None = None):
+        """
+        创建Globe 3D飞线图/迁徙图
+        
+        参数：
+            coords: list - 飞线路径列表，每个元素为(start, end)元组，表示从start到end的飞线
+            config: dict - 额外的配置项
+        
+        返回：
+            Pancharts - 图表实例
+        """
+        if config is None:
+            config = {}
+        
+        coords_data = []
+        for i in coords:
+            coords_data.append({
+                'coords': [self.data.loc[i[0]].tolist()[0:2], self.data.loc[i[1]].tolist()[0:2]]
+            })
+        
+        # 先合并基础globe配置和图表特有配置
+        globe_data_option = deep_merge(self.globe_config, GLOBE_LINES3D_OPTION)
+        
+        # 添加数据
+        globe_data_option["series"][0]["data"] = coords_data
+        
+        return Pancharts(graph_config={}, data_config=globe_data_option, user_option=config)
+
+
+class sk_vm:
+    """
+    股票K线图可视化类
+    
+    参数：
+        data: pandas DataFrame - 股票数据，索引为日期字符串
+            前四列依次为：开盘价、最高价、最低价、收盘价
+    
+    支持的图表类型：
+        - kline: K线图，支持移动平均线
+    """
+    
+    def __init__(self, data):
+        """
+        初始化sk_vm实例
+        
+        参数：
+            data: pandas DataFrame - 股票数据，索引为日期字符串
+                前四列依次为：开盘价、最高价、最低价、收盘价
+        """
+        self.data = data
+    
+    def kline(self, ma: int | list = None, config: dict | None = None):
+        """
+        绘制K线图
+        
+        参数：
+            ma: int | list - 移动平均线窗口大小，如5表示5日均线，[5, 20]表示5日和20日均线
+            config: dict - 自定义配置
+        
+        返回：
+            Pancharts - 图表实例
+        """
+        if config is None:
+            config = {}
+        
+        # 准备K线数据 [开盘, 收盘, 最低, 最高]
+        kline_data = []
+        dates = []
+        for date, row in self.data.iterrows():
+            dates.append(date)
+            kline_data.append([row.iloc[0], row.iloc[1], row.iloc[2], row.iloc[3]])
+        
+        # 构建数据配置
+        kline_option = deep_merge(KLINE_OPTION.copy(), {
+            "xAxis": {"data": dates},
+            "series": [{
+                "data": kline_data
+            }]
+        })
+        
+        # 添加移动平均线
+        if ma is not None:
+            if isinstance(ma, int):
+                ma = [ma]
+            
+            close_prices = self.data.iloc[:, 1]
+            colors = ["#5470c6", "#91cc75", "#fac858", "#ee6666", "#73c0de", "#3ba272"]
+            
+            for i, window in enumerate(ma):
+                ma_data = close_prices.rolling(window=window).mean()
+                # 将 NaN 值替换为 None，ECharts 会自动跳过这些点
+                ma_data = [None if pd.isna(val) else val for val in ma_data]
+                kline_option["series"].append({
+                    "name": f"MA{window}",
+                    "type": "line",
+                    "data": ma_data,
+                    "smooth": True,
+                    "lineStyle": {
+                        "color": colors[i % len(colors)],
+                        "opacity": 0.8
+                    }
+                })
+        
+        return Pancharts(graph_config={}, data_config=kline_option, user_option=config)
     
