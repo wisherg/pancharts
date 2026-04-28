@@ -28,12 +28,6 @@
         }
 
     </style>
-</head>
-<body>
-    <div class="container">
-        <div id="chart-{{ random_id }}"></div>
-    </div>
-
     <!-- 引入 ECharts 文件 -->
     <script src="{{ echarts_js_path }}"></script>
     
@@ -51,6 +45,17 @@
     {% if is_map_chart %}
     <script src="{{ map_url }}"></script>
     {% endif %}
+    
+    <!-- 引入高德地图相关文件（必须在head中加载） -->
+    {% if is_amap_chart %}
+    <script type="text/javascript" src="{{ amap_js_path }}"></script>
+    <script type="text/javascript" src="{{ amap_map_js_path }}"></script>
+    {% endif %}
+</head>
+<body>
+    <div class="container">
+        <div id="chart-{{ random_id }}"></div>
+    </div>
 
     <script>
         // 初始化 ECharts 实例
@@ -61,6 +66,18 @@
         
         // 使用配置项渲染图表
         chart.setOption(option);
+        
+        // 高德地图扩展组件初始化（仅在使用高德地图时执行）
+        {% if is_amap_chart %}
+        // Get AMap extension component
+        var amapComponent = chart.getModel().getComponent('amap');
+        // Get the instance of AMap
+        var amap = amapComponent.getAMap();
+        // Add some controls provided by AMap.
+        amap.addControl(new AMap.Scale());
+        amap.addControl(new AMap.ToolBar());
+        amapComponent.setEChartsLayerInteractive(true);
+        {% endif %}
         
         // 响应式处理
         window.addEventListener('resize', function() {
