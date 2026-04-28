@@ -159,40 +159,7 @@ def get_config_file_path():
     return os.path.abspath(os.path.join(os.path.dirname(__file__), 'chart_config.py'))
 
 
-def load_city_cnname():
-    """
-    加载城市中文名称数据文件
-    
-    返回:
-        pd.DataFrame - 包含城市中文名称的数据框
-    """
-    import os
-    file_path = os.path.join(os.path.dirname(__file__), 'datasets', 'city_cnname.csv')
-    return pd.read_csv(file_path)
 
-
-def load_city_lnglat():
-    """
-    加载城市经纬度数据文件
-    
-    返回:
-        pd.DataFrame - 包含城市经纬度的数据框
-    """
-    import os
-    file_path = os.path.join(os.path.dirname(__file__), 'datasets', 'city_lnglat.csv')
-    return pd.read_csv(file_path)
-
-
-def load_countries_info():
-    """
-    加载国家信息数据文件
-    
-    返回:
-        pd.DataFrame - 包含国家信息的数据框
-    """
-    import os
-    file_path = os.path.join(os.path.dirname(__file__), 'datasets', 'countries_info.csv')
-    return pd.read_csv(file_path)
 
 
 def create_visual_map(dataframe, map_types, columns):
@@ -304,24 +271,29 @@ def create_visual_map(dataframe, map_types, columns):
     return {"visualMap": visual_maps}
 
 
-
-
-def geocode_amap(address: str, api_key: str = None) -> tuple:
+def geocode_amap(address: str | list, api_key: str = None, retries: int = 3, interval: float = 0.3) -> tuple | list:
     """
     使用高德地图API进行地理编码，将地址转换为经纬度
     
     参数:
-        address: str - 要编码的地址
+        address: str | list - 要编码的地址，或地址列表
         api_key: str, optional - 高德地图API key，默认为None时使用配置文件中的key
+        retries: int - 失败重试次数，默认3次
+        interval: float - 请求间隔时间（秒），默认0.3秒
         
     返回:
-        tuple - (经度, 纬度)，如果失败返回(None, None)
+        tuple - 单个地址时返回 (经度, 纬度)
+        list - 地址列表时返回 ([经度列表], [纬度列表])
+        如果失败返回(None, None)或([None...], [None...])并输出错误信息
         
     示例:
         >>> geocode_amap("北京市朝阳区望京SOHO")
         (116.47366, 39.99924)
+        >>> geocode_amap(["北京市", "上海市"])
+        ([116.4074, 121.4737], [39.9042, 31.2304])
     """
     import requests
+    import time
     
     from .chart_config import AMAP_API_KEY
     
@@ -330,44 +302,86 @@ def geocode_amap(address: str, api_key: str = None) -> tuple:
     if not key:
         raise ValueError("请在chart_config.py中配置AMAP_API_KEY，或在调用时传入api_key参数")
     
-    url = "https://restapi.amap.com/v3/geocode/geo"
-    params = {
-        "address": address,
-        "key": key,
-        "output": "json"
-    }
+    is_batch = isinstance(address, list)
+    addresses = address if is_batch else [address]
     
-    try:
-        response = requests.get(url, params=params)
-        response.raise_for_status()
-        result = response.json()
+    def _single_request(addr: str) -> tuple:
+        url = "https://restapi.amap.com/v3/geocode/geo"
+        params = {
+            "address": addr,
+            "key": key,
+            "output": "json"
+        }
         
-        if result.get("status") == "1" and result.get("geocodes"):
-            location = result["geocodes"][0]["location"]
-            lng, lat = map(float, location.split(","))
-            return (lng, lat)
-        else:
-            return (None, None)
-    except Exception as e:
+        for retry in range(retries):
+            try:
+                response = requests.get(url, params=params)
+                response.raise_for_status()
+                result = response.json()
+                
+                if result.get("status") == "1" and result.get("geocodes"):
+                    location = result["geocodes"][0]["location"]
+                    lng, lat = map(float, location.split(","))
+                    return (lng, lat)
+                else:
+                    error_msg = f"高德地图API返回失败: status={result.get('status')}, info={result.get('info', '未知错误')}"
+                    print(f"[geocode_amap错误] {error_msg}")
+                    if retry < retries - 1:
+                        time.sleep(0.5)
+                        continue
+                    return (None, None)
+            except requests.exceptions.RequestException as e:
+                print(f"[geocode_amap错误] 网络请求失败: {str(e)}")
+                if retry < retries - 1:
+                    time.sleep(0.5)
+                    continue
+                return (None, None)
+            except Exception as e:
+                print(f"[geocode_amap错误] 解析结果失败: {str(e)}")
+                if retry < retries - 1:
+                    time.sleep(0.5)
+                    continue
+                return (None, None)
         return (None, None)
+    
+    results = []
+    for addr in addresses:
+        result = _single_request(addr)
+        results.append(result)
+        if addr != addresses[-1]:
+            time.sleep(interval)
+    
+    if is_batch:
+        lngs = [r[0] for r in results]
+        lats = [r[1] for r in results]
+        return (lngs, lats)
+    else:
+        return results[0]
 
 
-def geocode_opencage(address: str, api_key: str = None) -> tuple:
+def geocode_opencage(address: str | list, api_key: str = None, retries: int = 3, interval: float = 0.3) -> tuple | list:
     """
     使用OpenCage API进行地理编码，将地址转换为经纬度
     
     参数:
-        address: str - 要编码的地址
+        address: str | list - 要编码的地址，或地址列表
         api_key: str, optional - OpenCage API key，默认为None时使用配置文件中的key
+        retries: int - 失败重试次数，默认3次
+        interval: float - 请求间隔时间（秒），默认0.3秒
         
     返回:
-        tuple - (经度, 纬度)，如果失败返回(None, None)
+        tuple - 单个地址时返回 (经度, 纬度)
+        list - 地址列表时返回 ([经度列表], [纬度列表])
+        如果失败返回(None, None)或([None...], [None...])并输出错误信息
         
     示例:
         >>> geocode_opencage("Beijing, China")
         (116.397229, 39.9075)
+        >>> geocode_opencage(["Beijing, China", "Shanghai, China"])
+        ([116.397229, 121.4737], [39.9075, 31.2304])
     """
     import requests
+    import time
     
     from .chart_config import OPENCAGE_API_KEY
     
@@ -376,66 +390,56 @@ def geocode_opencage(address: str, api_key: str = None) -> tuple:
     if not key:
         raise ValueError("请在chart_config.py中配置OPENCAGE_API_KEY，或在调用时传入api_key参数")
     
-    url = "https://api.opencagedata.com/geocode/v1/json"
-    params = {
-        "q": address,
-        "key": key
-    }
+    is_batch = isinstance(address, list)
+    addresses = address if is_batch else [address]
     
-    try:
-        response = requests.get(url, params=params)
-        response.raise_for_status()
-        result = response.json()
+    def _single_request(addr: str) -> tuple:
+        url = "https://api.opencagedata.com/geocode/v1/json"
+        params = {
+            "q": addr,
+            "key": key
+        }
         
-        if result.get("results"):
-            geometry = result["results"][0]["geometry"]
-            return (geometry["lng"], geometry["lat"])
-        else:
-            return (None, None)
-    except Exception as e:
+        for retry in range(retries):
+            try:
+                response = requests.get(url, params=params)
+                response.raise_for_status()
+                result = response.json()
+                
+                if result.get("results"):
+                    geometry = result["results"][0]["geometry"]
+                    return (geometry["lng"], geometry["lat"])
+                else:
+                    error_msg = f"OpenCage API返回失败: status={result.get('status', {}).get('code', '未知')}, message={result.get('status', {}).get('message', '未知错误')}"
+                    print(f"[geocode_opencage错误] {error_msg}")
+                    if retry < retries - 1:
+                        time.sleep(0.5)
+                        continue
+                    return (None, None)
+            except requests.exceptions.RequestException as e:
+                print(f"[geocode_opencage错误] 网络请求失败: {str(e)}")
+                if retry < retries - 1:
+                    time.sleep(0.5)
+                    continue
+                return (None, None)
+            except Exception as e:
+                print(f"[geocode_opencage错误] 解析结果失败: {str(e)}")
+                if retry < retries - 1:
+                    time.sleep(0.5)
+                    continue
+                return (None, None)
         return (None, None)
-
-
-def geocode_baidu(address: str, api_key: str = None) -> tuple:
-    """
-    使用百度地图API进行地理编码，将地址转换为经纬度
     
-    参数:
-        address: str - 要编码的地址
-        api_key: str, optional - 百度地图API key，默认为None时使用配置文件中的key
-        
-    返回:
-        tuple - (经度, 纬度)，如果失败返回(None, None)
-        
-    示例:
-        >>> geocode_baidu("北京市朝阳区望京SOHO")
-        (116.47366, 39.99924)
-    """
-    import requests
+    results = []
+    for addr in addresses:
+        result = _single_request(addr)
+        results.append(result)
+        if addr != addresses[-1]:
+            time.sleep(interval)
     
-    from .chart_config import BAIDU_API_KEY
-    
-    key = api_key if api_key else BAIDU_API_KEY
-    
-    if not key:
-        raise ValueError("请在chart_config.py中配置BAIDU_API_KEY，或在调用时传入api_key参数")
-    
-    url = "https://api.map.baidu.com/geocoding/v3"
-    params = {
-        "address": address,
-        "output": "json",
-        "ak": key
-    }
-    
-    try:
-        response = requests.get(url, params=params)
-        response.raise_for_status()
-        result = response.json()
-        
-        if result.get("status") == 0 and result.get("result"):
-            location = result["result"]["location"]
-            return (location["lng"], location["lat"])
-        else:
-            return (None, None)
-    except Exception as e:
-        return (None, None)
+    if is_batch:
+        lngs = [r[0] for r in results]
+        lats = [r[1] for r in results]
+        return (lngs, lats)
+    else:
+        return results[0]
