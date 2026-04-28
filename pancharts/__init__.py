@@ -6,7 +6,7 @@ Pancharts - A Python library for generating ECharts visualizations
 """
 
 from .core import Pancharts
-from .pandas_charts import k_v, km_nv, k2_nv, k_vm, gk_vm
+from .pandas_charts import k_v, km_nv, k2_nv, k_vm, gk_vm, gk_vm_amap, gk_vm_globe, sk_vm
 from .utils import (
     add_quotes_to_keys,
     random_color,
@@ -14,9 +14,6 @@ from .utils import (
     get_index_type,
     get_value_type,
     deep_merge,
-    load_city_cnname,
-    load_city_lnglat,
-    load_countries_info,
     create_visual_map
 )
 from .agent import call_openai_api, parse_json_response, pchat, echat
@@ -43,10 +40,22 @@ from .chart_config import (
     GEO_OPTION,
     GEO_GRAPH_OPTION,
     GEO3D_BAR3D_OPTION,
-    GEO3D_LINES3D_OPTION
+    GEO3D_LINES3D_OPTION,
+    AMAP_OPTION,
+    AMAP_HEATMAP_OPTION,
+    AMAP_GRAPH_OPTION,
+    AMAP_LINES_OPTION,
+    GLOBE_BASIC_OPTION,
+    GLOBE_NIGHT_OPTION,
+    GLOBE_REALISTIC_OPTION,
+    GLOBE_TERRAIN_OPTION,
+    GLOBE_SCATTER_OPTION,
+    GLOBE_BAR3D_OPTION,
+    GLOBE_LINES3D_OPTION,
+    KLINE_OPTION
 )
 
-__version__ = "0.1.4.2"
+__version__ = "0.1.5"
 __author__ = "wang peng"
 __email__ = "wangpeng_621@163.com"
 
@@ -57,15 +66,14 @@ __all__ = [
     "k2_nv",
     "k_vm",
     "gk_vm",
+    "gk_vm_amap",
+    "gk_vm_globe",
     "add_quotes_to_keys",
     "random_color",
     "random_color_list",
     "get_index_type",
     "get_value_type",
     "deep_merge",
-    "load_city_cnname",
-    "load_city_lnglat",
-    "load_countries_info",
     "create_visual_map",
     "call_openai_api",
     "parse_json_response",
@@ -93,5 +101,18 @@ __all__ = [
     "GEO_OPTION",
     "GEO_GRAPH_OPTION",
     "GEO3D_BAR3D_OPTION",
-    "GEO3D_LINES3D_OPTION"
+    "GEO3D_LINES3D_OPTION",
+    "AMAP_OPTION",
+    "AMAP_HEATMAP_OPTION",
+    "AMAP_GRAPH_OPTION",
+    "AMAP_LINES_OPTION",
+    "GLOBE_BASIC_OPTION",
+    "GLOBE_NIGHT_OPTION",
+    "GLOBE_REALISTIC_OPTION",
+    "GLOBE_TERRAIN_OPTION",
+    "GLOBE_SCATTER_OPTION",
+    "GLOBE_BAR3D_OPTION",
+    "GLOBE_LINES3D_OPTION",
+    "sk_vm",
+    "KLINE_OPTION"
 ]
