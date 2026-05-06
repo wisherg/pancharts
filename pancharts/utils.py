@@ -359,6 +359,161 @@ def geocode_amap(address: str | list, api_key: str = None, retries: int = 3, int
         return results[0]
 
 
+def merge_charts(options: list, grid_layout: list) -> dict:
+    """
+    使用ECharts的grid组件合并多个图表，注意仅仅支持直角坐标系图表
+    
+    参数:
+        options: list - 多个ECharts option配置构成的列表
+        grid_layout: list - 每行图表数量的列表，如[2,1]表示第一行2张图，第二行1张图
+        
+    返回:
+        dict - 合并后的ECharts option配置
+        
+    示例:
+        >>> option1 = {...}
+        >>> option2 = {...}
+        >>> option3 = {...}
+        >>> merged_option = merge_charts([option1, option2, option3], [2, 1])
+    """
+    if not isinstance(options, list) or len(options) == 0:
+        raise ValueError("options必须是非空列表")
+    if not isinstance(grid_layout, list) or len(grid_layout) == 0:
+        raise ValueError("grid_layout必须是非空列表")
+    
+    total_charts = sum(grid_layout)
+    if total_charts != len(options):
+        raise ValueError(f"grid_layout元素之和({total_charts})必须等于options长度({len(options)})")
+    
+    merged_option = {
+        "title": [],
+        "tooltip": {"trigger": "axis"},
+        "legend": [],
+        "grid": [],
+        "xAxis": [],
+        "yAxis": [],
+        "series": []
+    }
+    
+    chart_index = 0
+    total_rows = len(grid_layout)
+    
+    top_margin = 3
+    bottom_margin = 2
+    row_gap = 6
+    legend_height = 4
+    total_content_height = 100 - top_margin - bottom_margin - (total_rows - 1) * row_gap - total_rows * legend_height
+    row_height = total_content_height / total_rows
+    
+    for row_idx, cols in enumerate(grid_layout):
+        col_width = 100 / cols
+        col_gap = 1
+        
+        for col_idx in range(cols):
+            if chart_index >= len(options):
+                break
+            
+            option = options[chart_index].copy()
+            
+            x_start = col_idx * col_width
+            y_start = top_margin + row_idx * (row_height + row_gap)
+            
+            grid_width = col_width - col_gap if col_idx < cols - 1 else col_width - 0.5
+            grid_height = row_height - 1
+            
+            grid_item = {
+                "left": f"{x_start + 0.5}%",
+                "top": f"{y_start + 3}%",
+                "width": f"{grid_width - 0.5}%",
+                "height": f"{grid_height - 3}%",
+                "containLabel": True
+            }
+            merged_option["grid"].append(grid_item)
+            
+            x_axis = option.get("xAxis", {})
+            if isinstance(x_axis, dict):
+                x_axis = x_axis.copy()
+                x_axis["gridIndex"] = chart_index
+                merged_option["xAxis"].append(x_axis)
+            elif isinstance(x_axis, list):
+                for i, ax in enumerate(x_axis):
+                    ax_copy = ax.copy()
+                    ax_copy["gridIndex"] = chart_index
+                    merged_option["xAxis"].append(ax_copy)
+            
+            y_axis = option.get("yAxis", {})
+            if isinstance(y_axis, dict):
+                y_axis = y_axis.copy()
+                y_axis["gridIndex"] = chart_index
+                merged_option["yAxis"].append(y_axis)
+            elif isinstance(y_axis, list):
+                for i, ax in enumerate(y_axis):
+                    ax_copy = ax.copy()
+                    ax_copy["gridIndex"] = chart_index
+                    merged_option["yAxis"].append(ax_copy)
+            
+            title = option.get("title")
+            if title:
+                if isinstance(title, dict):
+                    title = title.copy()
+                    title["left"] = f"{x_start + col_width/2}%"
+                    title["top"] = f"{y_start - 2}%"
+                    title["textAlign"] = "center"
+                    title["textStyle"] = title.get("textStyle", {})
+                    title["textStyle"]["fontSize"] = title["textStyle"].get("fontSize", 14)
+                    merged_option["title"].append(title)
+                elif isinstance(title, list):
+                    for t in title:
+                        t_copy = t.copy()
+                        t_copy["left"] = f"{x_start + col_width/2}%"
+                        t_copy["top"] = f"{y_start - 2}%"
+                        t_copy["textAlign"] = "center"
+                        t_copy["textStyle"] = t_copy.get("textStyle", {})
+                        t_copy["textStyle"]["fontSize"] = t_copy["textStyle"].get("fontSize", 14)
+                        merged_option["title"].append(t_copy)
+            
+            legend = option.get("legend")
+            series_names = []
+            series_data = option.get("series", [])
+            if not isinstance(series_data, list):
+                series_data = [series_data]
+            for s in series_data:
+                if isinstance(s, dict) and "name" in s and s["name"]:
+                    series_names.append(s["name"])
+            
+            if legend or series_names:
+                legend_item = {
+                    "data": series_names,
+                    "left": f"{x_start + 2}%",
+                    "top": f"{y_start + row_height + 0.5}%",
+                    "textStyle": {"fontSize": 12}
+                }
+                
+                if isinstance(legend, dict):
+                    legend_item.update(legend.copy())
+                
+                merged_option["legend"].append(legend_item)
+            
+            series = option.get("series", [])
+            if not isinstance(series, list):
+                series = [series]
+            
+            for i, s in enumerate(series):
+                s_copy = s.copy()
+                s_copy["xAxisIndex"] = len(merged_option["xAxis"]) - 1
+                s_copy["yAxisIndex"] = len(merged_option["yAxis"]) - 1
+                merged_option["series"].append(s_copy)
+            
+            chart_index += 1
+    
+    if not merged_option["title"]:
+        del merged_option["title"]
+    if not merged_option["legend"]:
+        del merged_option["legend"]
+    
+    return merged_option
+
+
 def geocode_opencage(address: str | list, api_key: str = None, retries: int = 3, interval: float = 0.3) -> tuple | list:
     """
     使用OpenCage API进行地理编码，将地址转换为经纬度
