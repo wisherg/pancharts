@@ -24,6 +24,11 @@ OPENCAGE_API_KEY = ""
 # node_modules文件夹的绝对地址
 NODE_MODULES_PATH = None
 
+# 你的全局字典
+GLOBAL_SETTINGS = {
+    "package_name": "pancharts"
+}
+
 
 # 全局默认配置，优先级最低
 # https://echarts.apache.org/zh/theme-builder.html
