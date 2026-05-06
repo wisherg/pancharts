@@ -60,7 +60,7 @@ class Pancharts:
         self._graph_config = graph_config or {}
         self._template_dir = Path(__file__).parent / "templates"
         
-        # 初始化默认属性，在_prepare_render_data中会重新设置
+        # 初始化默认属性，在prepare_render_data中会重新设置
         self._init = {}
         # 从全局配置中获取默认值
         self.echarts_source = GLOBAL_DEFAULT_CONFIG.get("init", {}).get("echarts_source", "local")
@@ -69,13 +69,16 @@ class Pancharts:
         self._renderer = GLOBAL_DEFAULT_CONFIG.get("init", {}).get("renderer", "canvas")
         self._theme = GLOBAL_DEFAULT_CONFIG.get("init", {}).get("theme", "")
         
-        # 初始化地图相关属性，在_prepare_render_data中会重新检测和设置
+        # 初始化地图相关属性，在prepare_render_data中会重新检测和设置
         self._map_filename_dict = {}
         self.is_map_chart = False
         self.map_name = "china"
         self.echarts_map_name = "china"
         # 高德地图相关属性
         self.is_amap_chart = False
+        
+        # 渲染选项字典，用于统一传递参数到模板
+        self.render_option = {}
     
     @property
     def option(self):
@@ -258,7 +261,7 @@ class Pancharts:
                     # 无法转换，返回空字符串
                     return ""
     
-    def _prepare_render_data(self):
+    def prepare_render_data(self):
         """
         准备渲染所需的共享数据
 
@@ -524,29 +527,35 @@ class Pancharts:
         random_id = random.randint(100, 999)
         
         # 准备渲染数据
-        render_data = self._prepare_render_data()
+        render_data = self.prepare_render_data()
+        
+        # 获取描述信息
+        desc = self._user_option.get("desc", "")
+        
+        # 构建统一的渲染选项字典
+        self.render_option = {
+            "echarts_js_path": render_data["echarts_js_path"],
+            "echarts_gl_js_path": render_data["echarts_gl_js_path"],
+            "use_echarts_gl": render_data["use_echarts_gl"],
+            "echarts_wordcloud_js_path": render_data["echarts_wordcloud_js_path"],
+            "use_echarts_wordcloud": render_data["use_echarts_wordcloud"],
+            "option": render_data["rendered_option"],
+            "random_id": random_id,
+            "width": self._width,
+            "height": self._height,
+            "renderer": self._renderer,
+            "theme": self._theme,
+            "is_map_chart": self.is_map_chart,
+            "map_name": self.map_name if self.is_map_chart else "",
+            "map_url": render_data["map_url"],
+            "is_amap_chart": render_data["is_amap_chart"],
+            "amap_js_path": render_data["amap_js_path"],
+            "amap_map_js_path": render_data["amap_map_js_path"],
+            "desc": desc
+        }
         
         # 渲染模板
-        html_content = template.render(
-            echarts_js_path=render_data["echarts_js_path"],
-            echarts_gl_js_path=render_data["echarts_gl_js_path"],
-            use_echarts_gl=render_data["use_echarts_gl"],
-            echarts_wordcloud_js_path=render_data["echarts_wordcloud_js_path"],
-            use_echarts_wordcloud=render_data["use_echarts_wordcloud"],
-            option=render_data["rendered_option"],
-            random_id=random_id,
-            width=self._width,
-            height=self._height,
-            renderer=self._renderer,
-            theme=self._theme,
-            is_map_chart=self.is_map_chart,
-            map_name=self.map_name if self.is_map_chart else "",
-            map_url=render_data["map_url"],
-            # 高德地图相关
-            is_amap_chart=render_data["is_amap_chart"],
-            amap_js_path=render_data["amap_js_path"],
-            amap_map_js_path=render_data["amap_map_js_path"]
-        )
+        html_content = template.render(**self.render_option)
         
         # 保存生成的HTML文件
         html_file_path = output_path / filename
@@ -571,28 +580,34 @@ class Pancharts:
         chart_id = uuid.uuid4().hex
         
         # 准备渲染数据（支持本地资源优先）
-        render_data = self._prepare_render_data()
+        render_data = self.prepare_render_data()
+        
+        # 获取描述信息
+        desc = self._user_option.get("desc", "")
+        
+        # 构建统一的渲染选项字典
+        self.render_option = {
+            "echarts_js_path": render_data["echarts_js_path"],
+            "echarts_gl_js_path": render_data["echarts_gl_js_path"],
+            "use_echarts_gl": render_data["use_echarts_gl"],
+            "echarts_wordcloud_js_path": render_data["echarts_wordcloud_js_path"],
+            "use_echarts_wordcloud": render_data["use_echarts_wordcloud"],
+            "option": render_data["rendered_option"],
+            "chart_id": chart_id,
+            "width": self._width,
+            "height": self._height,
+            "renderer": self._renderer,
+            "theme": self._theme,
+            "map_url": render_data["map_url"],
+            "map_name": self.map_name,
+            "is_amap_chart": render_data["is_amap_chart"],
+            "amap_js_path": render_data["amap_js_path"],
+            "amap_map_js_path": render_data["amap_map_js_path"],
+            "desc": desc
+        }
         
         # 渲染模板
-        html_content = template.render(
-            echarts_js_path=render_data["echarts_js_path"],
-            echarts_gl_js_path=render_data["echarts_gl_js_path"],
-            use_echarts_gl=render_data["use_echarts_gl"],
-            echarts_wordcloud_js_path=render_data["echarts_wordcloud_js_path"],
-            use_echarts_wordcloud=render_data["use_echarts_wordcloud"],
-            option=render_data["rendered_option"],
-            chart_id=chart_id,
-            width=self._width,
-            height=self._height,
-            renderer=self._renderer,
-            theme=self._theme,
-            map_url=render_data["map_url"],
-            map_name=self.map_name,
-            # 高德地图相关
-            is_amap_chart=render_data["is_amap_chart"],
-            amap_js_path=render_data["amap_js_path"],
-            amap_map_js_path=render_data["amap_map_js_path"]
-        )
+        html_content = template.render(**self.render_option)
         
         # 返回HTML内容，与pyecharts兼容，直接显示在Jupyter Notebook中
         from IPython.display import HTML
