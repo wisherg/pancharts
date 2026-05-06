@@ -64,11 +64,19 @@ def parse_json_response(response_content, verbose=False):
     返回：
         dict - 解析后的字典，如果解析失败返回空字典
     """
-    # 移除Markdown代码块标记
-    if response_content.startswith('```json'):
-        response_content = response_content[7:]
-    if response_content.endswith('```'):
-        response_content = response_content[:-3]
+    # 查找并提取第一个 { 和最后一个 } 之间的内容
+    first_brace = response_content.find('{')
+    last_brace = response_content.rfind('}')
+    
+    if first_brace != -1 and last_brace != -1 and first_brace < last_brace:
+        response_content = response_content[first_brace:last_brace + 1]
+    else:
+        # 如果没有找到完整的 { } 结构，移除Markdown代码块标记并尝试解析
+        if response_content.startswith('```json'):
+            response_content = response_content[7:]
+        if response_content.endswith('```'):
+            response_content = response_content[:-3]
+    
     response_content = response_content.strip()
     
     # 打印大模型返回结果（如果verbose为True）
@@ -164,7 +172,7 @@ def echat(question: str) -> None:
     3. 当需要使用JavaScript函数时，必须将函数代码用"JsCode:"前缀包裹
        例如：{"formatter": "JsCode:function(params) { return params.name + ': ' + params.value; }"}
     4. 此配置的中布尔需要符合python规范，即需要写成True与False。
-    5. 只返回option配置，option内部不要包含其他解释文字
+    5. 只返回option配置，option内部不要包含其他解释文字，外部可以有适当的解释
     6. 如果用户的问题需要完整的图表配置，生成完整的option；如果只是部分配置，生成部分配置
     """
     
@@ -172,7 +180,7 @@ def echat(question: str) -> None:
     user_prompt = f"""
     用户问题: {question}
     
-    请根据问题生成对应的ECharts option配置，不要包含其他内容
+    请根据问题生成对应的ECharts option配置
     """
     
     # 调用AI API
