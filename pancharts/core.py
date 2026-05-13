@@ -56,7 +56,7 @@ class Pancharts:
             graph_config: dict, optional - 图形配置项
         """
         self._user_option = user_option or {}
-        self._data_config = data_config or {}
+        self.data_config = data_config or {}
         self._graph_config = graph_config or {}
         self._template_dir = Path(__file__).parent / "templates"
         
@@ -87,7 +87,7 @@ class Pancharts:
         from .utils import deep_merge
         merged = GLOBAL_DEFAULT_CONFIG.copy()
         merged = deep_merge(merged, self._graph_config)
-        merged = deep_merge(merged, self._data_config)
+        merged = deep_merge(merged, self.data_config)
         merged = deep_merge(merged, self._user_option)
         return merged
     
@@ -504,13 +504,15 @@ class Pancharts:
             "amap_map_js_path": amap_map_js_path
         }
     
-    def to_db(self, tag0: str = "", tag1: str = "") -> dict:
+    def to_db(self, tag0: str = "", tag1: str = "", data_desc: str = "", data_insight: str = "") -> dict:
         """
         将当前图表配置保存到SQLite数据库
         
         参数：
             tag0: str - 自定义标签0，默认为空字符串
             tag1: str - 自定义标签1，默认为空字符串
+            data_desc: str - 数据描述，默认为空字符串
+            data_insight: str - 数据洞察，默认为空字符串
         
         返回：
             dict - 包含执行结果的字典，格式为：
@@ -558,7 +560,7 @@ class Pancharts:
             
             # 获取 option 和 data_config
             option_json = json.dumps(self.option, ensure_ascii=False, indent=2)
-            data_config_json = json.dumps(self._data_config, ensure_ascii=False, indent=2)
+            data_config_json = json.dumps(self.data_config, ensure_ascii=False, indent=2)
             
             # 获取当前时间
             from datetime import datetime
@@ -569,9 +571,9 @@ class Pancharts:
             cursor = conn.cursor()
             
             cursor.execute('''
-                INSERT INTO pancharts_options (insert_time, option, data_option, file_path, tag0, tag1)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', (insert_time, option_json, data_config_json, file_path, tag0, tag1))
+                INSERT INTO pancharts_options (insert_time, option, data_option, file_path, tag0, tag1, data_desc, data_insight)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (insert_time, option_json, data_config_json, file_path, tag0, tag1, data_desc, data_insight))
             
             conn.commit()
             conn.close()
