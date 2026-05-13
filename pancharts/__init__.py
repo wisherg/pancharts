@@ -55,7 +55,7 @@ from .chart_config import (
     KLINE_OPTION
 )
 
-__version__ = "0.1.6.1"
+__version__ = "0.1.7"
 __author__ = "wang peng"
 __email__ = "wangpeng_621@163.com"
 
