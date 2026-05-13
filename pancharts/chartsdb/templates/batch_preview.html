@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>批量预览 - Pancharts数据管理</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f7fa;
+            padding: 20px;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 {
+            font-size: 24px;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn-primary {
+            background: #fff;
+            color: #667eea;
+            font-weight: 600;
+        }
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        .btn-secondary {
+            background: rgba(255,255,255,0.2);
+            color: white;
+        }
+        .btn-secondary:hover {
+            background: rgba(255,255,255,0.3);
+        }
+        .chart-row {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .chart-row-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .chart-row-header h3 {
+            font-size: 16px;
+            color: #333;
+        }
+        .chart-info {
+            font-size: 12px;
+            color: #666;
+        }
+        .pancharts-container {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+        }
+        .pancharts-chart {
+            width: 100%;
+            height: 400px;
+            flex: 1;
+        }
+        .pancharts-desc {
+            width: 300px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 8px;
+            border-left: 4px solid #1890ff;
+            font-size: 14px;
+            line-height: 1.6;
+            color: #333;
+        }
+        .pancharts-desc-title {
+            font-weight: bold;
+            font-size: 16px;
+            margin-bottom: 10px;
+            color: #1890ff;
+        }
+        .no-charts {
+            text-align: center;
+            padding: 60px;
+            background: #fff;
+            border-radius: 8px;
+            color: #666;
+        }
+        @media print {
+            .header {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+            }
+            .chart-row {
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+    {% for js_url in js_dependencies %}
+    <script src="{{ js_url }}"></script>
+    {% endfor %}
+</head>
+<body>
+    <div class="header">
+        <div>
+            <h1>批量预览</h1>
+            <p style="opacity: 0.9; font-size: 14px; margin-top: 5px;">共 {{ charts|length }} 个图表</p>
+        </div>
+        <div style="display: flex; gap: 10px;">
+            <a href="/" class="btn btn-secondary">← 返回列表</a>
+            <button type="button" id="download-btn" class="btn btn-primary">下载页面</button>
+        </div>
+    </div>
+    
+    {% if charts %}
+        {% for chart in charts %}
+        <div class="chart-row">
+            <div class="chart-row-header">
+                <div>
+                    <h3>图表 {{ loop.index }} - ID: {{ chart.id }}</h3>
+                    <div class="chart-info">
+                        标签0: {{ chart.tag0 or '-' }} | 标签1: {{ chart.tag1 or '-' }} | {{ chart.insert_time[:19] }}
+                    </div>
+                </div>
+            </div>
+            <div class="pancharts-container">
+                <div id="chart-{{ chart.random_id }}" class="pancharts-chart"></div>
+                {% if chart.desc %}
+                <div class="pancharts-desc">
+                    <div class="pancharts-desc-title">图表说明</div>
+                    {{ chart.desc }}
+                </div>
+                {% endif %}
+            </div>
+            <script type="application/json" id="chart-config-{{ chart.random_id }}">
+            {
+                "random_id": "{{ chart.random_id }}",
+                "theme": "{{ chart.theme }}",
+                "renderer": "{{ chart.renderer }}",
+                "option": {{ chart.option|safe }},
+                "is_amap_chart": {% if chart.is_amap_chart %}true{% else %}false{% endif %}
+            }
+            </script>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="no-charts">
+            <p>没有找到图表数据</p>
+        </div>
+    {% endif %}
+    
+    <script>
+        document.getElementById('download-btn').addEventListener('click', function() {
+            var htmlContent = document.documentElement.outerHTML;
+            var blob = new Blob([htmlContent], { type: 'text/html' });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = 'batch-preview.html';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+        
+        function initChart(configId, chartId) {
+            var configEl = document.getElementById(configId);
+            var chartDom = document.getElementById(chartId);
+            
+            if (!configEl || !chartDom) {
+                console.warn('Chart config or container not found:', chartId);
+                return;
+            }
+            
+            if (chartDom._pancharts_initialized) return;
+            chartDom._pancharts_initialized = true;
+            
+            if (typeof echarts === 'undefined') {
+                console.warn('ECharts not found, cannot initialize chart:', chartId);
+                return;
+            }
+            
+            try {
+                var config = JSON.parse(configEl.textContent);
+                var chart = echarts.init(chartDom, config.theme, { renderer: config.renderer });
+                chart.setOption(config.option);
+                
+                var resizeHandler = function() {
+                    chart.resize();
+                };
+                window.addEventListener('resize', resizeHandler);
+                
+                chartDom._pancharts_chart = chart;
+                chartDom._pancharts_resizeHandler = resizeHandler;
+                
+            } catch (e) {
+                console.error('Failed to initialize chart:', chartId, e);
+            }
+        }
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            var configElements = document.querySelectorAll('script[type="application/json"]');
+            configElements.forEach(function(el) {
+                var configId = el.id;
+                var chartId = configId.replace('chart-config-', 'chart-');
+                initChart(configId, chartId);
+            });
+        });
+    </script>
+</body>
+</html>
