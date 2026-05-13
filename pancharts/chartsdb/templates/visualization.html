@@ -263,9 +263,33 @@
         
         <div class="card">
             <div class="card-header">
-                <h2>数据信息详情</h2>
+                <h2>数据预览</h2>
             </div>
-            <pre id="data-info-content" class="code-block" style="min-height: 150px;"></pre>
+            <div class="table-container">
+                <table id="data-preview-table"></table>
+            </div>
+            <div class="preview-note">显示前 10 行数据 | 共 <span id="preview-row-count">0</span> 行 <span id="preview-col-count">0</span> 列</div>
+            <button class="btn btn-secondary btn-sm" onclick="togglePreviewDisplay()">显示全部</button>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h2>数据类型设置</h2>
+            </div>
+            <div class="card-body">
+                <div class="form-group">
+                    <label for="reconstruct-type">数据类型：</label>
+                    <select id="reconstruct-type" class="tag-input">
+                        <option value="dataframe">DataFrame</option>
+                        <option value="series">Series</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="index-columns">索引列：</label>
+                    <select id="index-columns" class="tag-input" multiple size="4" style="height: auto;"></select>
+                    <small class="form-text text-muted">按住Ctrl键可多选</small>
+                </div>
+            </div>
         </div>
         
         <div class="card">
@@ -359,47 +383,72 @@
             
             <div class="card">
                 <div class="card-header">
-                    <h2>数据分析</h2>
+                    <h2>Data Option 配置</h2>
                 </div>
-                <div class="ai-controls" style="margin-bottom: 10px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                    <button type="button" id="desc-chat-btn" class="btn btn-primary">生成分析</button>
-                    <button type="button" id="desc-copy-btn" class="btn btn-secondary">一键复制</button>
-                    <div style="display: flex; align-items: center; gap: 5px;">
-                        <label style="margin: 0;">输出字数:</label>
-                        <input type="number" id="desc-max-words" class="tag-input" style="width: 100px; padding: 5px;" value="500" min="50" max="2000">
+                <div class="options-container" style="min-height: 800px;">
+                    <div class="option-panel" style="display: flex; flex-direction: column; height: 100%; min-height: 800px;">
+                        <div class="option-panel-header">
+                            <h2>数据配置</h2>
+                        </div>
+                        <div class="form-group" style="flex: 1;">
+                            <textarea id="data_option" class="form-control" style="height: 100%; min-height: 750px;" placeholder="数据配置将显示在这里"></textarea>
+                        </div>
                     </div>
-                    <span id="desc-loading-indicator" class="loading-indicator">分析中...</span>
-                </div>
-                <div class="ai-prompt-section" style="margin-bottom: 10px;">
-                    <textarea id="desc-prompt" style="min-height: 100px;" placeholder="输入分析要求，例如：&#10;- 分析数据的趋势和特征&#10;- 找出数据中的关键指标&#10;- 分析数据的商业意义"></textarea>
-                </div>
-                <div id="desc-message" style="margin-bottom: 10px;"></div>
-                <div class="form-group">
-                    <textarea id="desc-result" class="form-control" style="min-height: 300px;" placeholder="分析结果将显示在这里"></textarea>
+                    
+                    <div class="option-panel" style="display: flex; flex-direction: column; height: 100%; min-height: 800px;">
+                        <div class="option-panel-header">
+                            <h2>数据分析</h2>
+                        </div>
+                        <div class="ai-controls" style="margin-bottom: 10px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                            <button type="button" id="desc-chat-btn" class="btn btn-primary">生成分析</button>
+                            <button type="button" id="desc-copy-btn" class="btn btn-secondary">一键复制</button>
+                            <div style="display: flex; align-items: center; gap: 5px;">
+                                <label style="margin: 0;">输出字数:</label>
+                                <input type="number" id="desc-max-words" class="tag-input" style="width: 100px; padding: 5px;" value="500" min="50" max="2000">
+                            </div>
+                            <span id="desc-loading-indicator" class="loading-indicator">分析中...</span>
+                        </div>
+                        <div class="ai-prompt-section" style="margin-bottom: 10px;">
+                            <textarea id="desc-prompt" style="min-height: 120px;" placeholder="输入分析要求，例如：&#10;- 分析数据的趋势和特征&#10;- 找出数据中的关键指标&#10;- 分析数据的商业意义"></textarea>
+                        </div>
+                        <div id="desc-message" style="margin-bottom: 10px;"></div>
+                        <div class="form-group" style="flex: 1;">
+                            <textarea id="desc-result" class="form-control" style="height: 100%; min-height: 600px;" placeholder="分析结果将显示在这里"></textarea>
+                        </div>
+                    </div>
                 </div>
             </div>
             
             <div class="card">
-                <div class="card-header">
-                    <h2>保存到数据库</h2>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="tag0">标签0</label>
-                        <input type="text" id="tag0" class="tag-input" placeholder="输入标签0">
-                    </div>
-                    <div class="form-group">
-                        <label for="tag1">标签1</label>
-                        <input type="text" id="tag1" class="tag-input" placeholder="输入标签1">
-                    </div>
-                </div>
-                <div style="display: flex; gap: 10px; align-items: center;">
-                    <button type="button" id="save-btn" class="btn btn-primary">保存到数据库</button>
-                    <span id="save-loading-indicator" class="loading-indicator">保存中...</span>
-                </div>
-                <div id="save-message" style="margin-top: 10px;"></div>
+            <div class="card-header">
+                <h2>保存到数据库</h2>
             </div>
-        </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="tag0">标签0</label>
+                    <input type="text" id="tag0" class="tag-input" placeholder="输入标签0">
+                </div>
+                <div class="form-group">
+                    <label for="tag1">标签1</label>
+                    <input type="text" id="tag1" class="tag-input" placeholder="输入标签1">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex: 1;">
+                    <label for="data_desc">数据描述</label>
+                    <textarea id="data_desc" class="tag-input" style="min-height: 60px; font-family: inherit;" placeholder="输入数据描述"></textarea>
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label for="data_insight">数据洞察</label>
+                    <textarea id="data_insight" class="tag-input" style="min-height: 60px; font-family: inherit;" placeholder="输入数据洞察"></textarea>
+                </div>
+            </div>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <button type="button" id="save-btn" class="btn btn-primary">保存到数据库</button>
+                <span id="save-loading-indicator" class="loading-indicator">保存中...</span>
+            </div>
+            <div id="save-message" style="margin-top: 10px;"></div>
+        </div></div>
     </div>
     
     <script>
@@ -457,8 +506,10 @@
             }
         };
         
-        document.addEventListener('DOMContentLoaded', async function() {
-            const dataStr = sessionStorage.getItem('visualizationData');
+        let showAllPreview = false;
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            const dataStr = localStorage.getItem('visualizationData');
             if (dataStr) {
                 visualizationData = JSON.parse(dataStr);
                 document.getElementById('data-file-name').textContent = visualizationData.fileName || '未知';
@@ -467,7 +518,15 @@
                 document.getElementById('data-type').textContent = 
                     visualizationData.dataType === 'series' ? 'Series' : 'DataFrame';
                 
-                await loadDataInfo();
+                renderDataPreview();
+                populateIndexColumns();
+                
+                if (visualizationData.desc) {
+                    document.getElementById('data_desc').value = visualizationData.desc;
+                    document.getElementById('desc-prompt').value = visualizationData.desc;
+                }
+                
+                localStorage.removeItem('visualizationData');
             } else {
                 document.getElementById('data-file-name').textContent = '未找到数据';
             }
@@ -475,29 +534,107 @@
             initEventListeners();
         });
         
-        async function loadDataInfo() {
-            if (!visualizationData) return;
+        function populateIndexColumns() {
+            const select = document.getElementById('index-columns');
+            select.innerHTML = '';
             
-            try {
-                const response = await fetch('/api/get-data-info', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        data: visualizationData.data,
-                        data_type: visualizationData.dataType || 'dataframe'
-                    })
+            if (!visualizationData || !visualizationData.data || visualizationData.data.length === 0) {
+                return;
+            }
+            
+            // 获取所有列名
+            const columns = Object.keys(visualizationData.data[0]);
+            
+            // 添加选项
+            columns.forEach(column => {
+                const option = document.createElement('option');
+                option.value = column;
+                option.textContent = column;
+                select.appendChild(option);
+            });
+        }
+        
+        function renderDataPreview() {
+            if (!visualizationData || !visualizationData.data) return;
+            
+            const data = visualizationData.data;
+            const table = document.getElementById('data-preview-table');
+            const rowCountElement = document.getElementById('preview-row-count');
+            const colCountElement = document.getElementById('preview-col-count');
+            const indexInfo = visualizationData.indexInfo || null;
+            
+            if (!Array.isArray(data) || data.length === 0) {
+                table.innerHTML = '<tr><td colspan="100">没有数据</td></tr>';
+                return;
+            }
+            
+            const displayData = showAllPreview ? data : data.slice(0, 10);
+            const headers = Object.keys(data[0]);
+            
+            // 计算显示的列数
+            let displayHeaders = headers;
+            let actualColCount = headers.length;
+            
+            if (indexInfo && indexInfo.has_index) {
+                if (indexInfo.is_multi_index && indexInfo.index_names) {
+                    // 多重索引
+                    displayHeaders = [...indexInfo.index_names, ...headers];
+                    actualColCount = indexInfo.index_names.length + headers.length;
+                } else if (indexInfo.index_name) {
+                    // 单重索引
+                    displayHeaders = [indexInfo.index_name, ...headers];
+                    actualColCount = 1 + headers.length;
+                }
+            }
+            
+            rowCountElement.textContent = data.length;
+            colCountElement.textContent = actualColCount;
+            
+            let html = '<thead><tr>';
+            displayHeaders.forEach(header => {
+                html += `<th>${header}</th>`;
+            });
+            html += '</tr></thead><tbody>';
+            
+            displayData.forEach((row, idx) => {
+                html += '<tr>';
+                
+                // 显示索引列
+                if (indexInfo && indexInfo.has_index) {
+                    if (indexInfo.is_multi_index && indexInfo.index_values) {
+                        // 多重索引
+                        const actualIdx = showAllPreview ? idx : idx;
+                        const indexValue = indexInfo.index_values[actualIdx];
+                        if (Array.isArray(indexValue)) {
+                            indexValue.forEach(val => {
+                                html += `<td>${val !== undefined ? val : ''}</td>`;
+                            });
+                        }
+                    } else if (indexInfo.index_values) {
+                        // 单重索引
+                        const actualIdx = showAllPreview ? idx : idx;
+                        const indexValue = indexInfo.index_values[actualIdx];
+                        html += `<td>${indexValue !== undefined ? indexValue : ''}</td>`;
+                    }
+                }
+                
+                // 显示数据列
+                headers.forEach(header => {
+                    html += `<td>${row[header] !== undefined ? row[header] : ''}</td>`;
                 });
                 
-                const result = await response.json();
-                
-                if (result.success) {
-                    document.getElementById('data-info-content').textContent = result.data_info;
-                } else {
-                    document.getElementById('data-info-content').textContent = '获取数据信息失败: ' + result.error;
-                }
-            } catch (error) {
-                document.getElementById('data-info-content').textContent = '获取数据信息失败: ' + error.message;
-            }
+                html += '</tr>';
+            });
+            html += '</tbody>';
+            
+            table.innerHTML = html;
+        }
+        
+        function togglePreviewDisplay() {
+            showAllPreview = !showAllPreview;
+            renderDataPreview();
+            const button = document.querySelector('button[onclick="togglePreviewDisplay()"]');
+            button.textContent = showAllPreview ? '显示部分' : '显示全部';
         }
         
         function initEventListeners() {
@@ -578,6 +715,10 @@
                 return;
             }
             
+            const reconstructType = document.getElementById('reconstruct-type').value;
+            const selectElement = document.getElementById('index-columns');
+            const indexColumns = Array.from(selectElement.selectedOptions).map(option => option.value);
+            
             const params = {};
             const methodParams = paramsMap[visClass]?.[method] || [];
             methodParams.forEach(param => {
@@ -601,7 +742,10 @@
                         method: method,
                         data: visualizationData.data,
                         data_type: visualizationData.dataType || 'dataframe',
-                        params: params
+                        reconstruct_type: reconstructType,
+                        index_columns: indexColumns,
+                        params: params,
+                        index_info: visualizationData.indexInfo || null
                     })
                 });
                 
@@ -616,6 +760,10 @@
                     document.getElementById('ai-option').value = '';
                     document.getElementById('ai-prompt').value = '';
                     document.getElementById('ai-message').innerHTML = '';
+                    
+                    if (result.data_config) {
+                        document.getElementById('data_option').value = JSON.stringify(result.data_config, null, 2);
+                    }
                     
                     document.getElementById('visualization-result').classList.remove('hidden');
                     
@@ -911,8 +1059,11 @@
         
         async function saveToDB() {
             const optionText = document.getElementById('option').value;
+            const dataOptionText = document.getElementById('data_option').value || JSON.stringify({});
             const tag0 = document.getElementById('tag0').value;
             const tag1 = document.getElementById('tag1').value;
+            const dataDesc = document.getElementById('data_desc').value;
+            const dataInsight = document.getElementById('data_insight').value;
             const loadingIndicator = document.getElementById('save-loading-indicator');
             const messageDiv = document.getElementById('save-message');
             
@@ -932,9 +1083,12 @@
                     },
                     body: JSON.stringify({
                         option: optionText,
+                        data_option: dataOptionText,
                         tag0: tag0,
                         tag1: tag1,
-                        file_path: visualizationData?.fileName || ''
+                        file_path: visualizationData?.fileName || '',
+                        data_desc: dataDesc,
+                        data_insight: dataInsight
                     })
                 });
                 
