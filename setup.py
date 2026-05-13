@@ -18,7 +18,12 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     package_data={
-        "pancharts": ["templates/*.html", "datasets/*.json"]
+        "pancharts": [
+            "templates/*.html",
+            "datasets/*.json",
+            "datasets/*.md",
+            "chartsdb/templates/*.html"
+        ]
     },
     install_requires=[
         "pandas>=1.0.0",
