@@ -236,16 +236,17 @@ def desc_chat(user_requirement: str, data_config: str, max_words: int = 200) -> 
     return response
 
 
-def data_chat(data, user_requirement: str) -> dict:
+def data_chat(data, user_requirement: str, data_desc: str = "") -> dict:
     """
     基于数据和用户需求生成并执行pandas统计代码
     
     参数：
         data: pd.DataFrame 或 pd.Series - 要进行统计的数据
         user_requirement: str - 用户的统计需求
+        data_desc: str - 数据描述（可选）
         
     返回：
-        dict - 包含统计结果(result)和执行的代码(code)
+        dict - 包含统计结果(result)、执行的代码(code)和结果描述(result_desc)
     """
     import pandas as pd
     import io
@@ -254,19 +255,16 @@ def data_chat(data, user_requirement: str) -> dict:
     data.info(buf=info_buffer)
     data_info = info_buffer.getvalue()
     
-    columns_info = f"列名: {list(data.columns) if isinstance(data, pd.DataFrame) else 'Series'}"
-    dtypes_info = f"数据类型:\n{data.dtypes.to_string()}"
-    
-    system_prompt = """你是一个专业的Python数据分析师。请根据用户的统计需求和数据信息，生成正确的pandas代码。
+    system_prompt = """你是一个专业的Python数据分析师。请根据用户的统计需求和数据信息，生成正确的Python代码。
 
 注意事项：
 1. 代码必须基于变量 `data` 开始，data 是输入的DataFrame或Series
-2. 只能使用pandas库进行统计分析
-3. 代码必须是可执行的Python代码
-4. 只返回代码，不返回其他解释文字
-5. 如果是DataFrame，使用 data 作为变量名；如果是Series，也使用 data 作为变量名
-6. 支持单行或多行代码，多行代码时最后一行必须将结果赋值给变量 `result`
-7. 返回结果应该是统计计算的结果（DataFrame、Series或标量值）
+2. 可以使用 pandas、numpy、scipy、seaborn 等常用数据分析库，但请在代码开头添加 import 语句导入
+4. 代码必须是可执行的Python代码
+5. 只返回代码，不返回其他解释文字
+6. 如果是DataFrame，使用 data 作为变量名；如果是Series，也使用 data 作为变量名
+7. 支持单行或多行代码，多行代码时最后一行必须将结果赋值给变量 `result`
+8. 返回结果应该是统计计算的结果（DataFrame、Series或标量值）
 
 示例（单行）：
 用户需求: 计算各列的均值
@@ -277,14 +275,19 @@ def data_chat(data, user_requirement: str) -> dict:
 代码: 
 grouped = data.groupby('category')
 result = grouped['value'].mean()
+
+示例（需要导入其他库）：
+用户需求: 计算数据的标准差
+代码: 
+import numpy as np
+result = np.std(data['value'])
 """
+    
+    desc_text = f"\n数据描述: {data_desc}" if data_desc else ""
     
     user_prompt = f"""数据信息:
 {data_info}
-
-{columns_info}
-
-{dtypes_info}
+{desc_text}
 
 用户统计需求: {user_requirement}
 
@@ -301,19 +304,53 @@ result = grouped['value'].mean()
     code = code.strip()
     
     try:
-        local_vars = {'data': data, 'pd': pd}
+        import pandas as pd
+        
+        exec_globals = globals().copy()
+        exec_globals['pd'] = pd
+        exec_globals['pandas'] = pd
+        
+        local_vars = {'data': data}
         
         if '\n' in code:
-            exec(code, globals(), local_vars)
+            exec(code, exec_globals, local_vars)
         else:
-            exec(f"result = {code}", globals(), local_vars)
+            exec(f"result = {code}", exec_globals, local_vars)
         
         result = local_vars.get('result')
+        
+        result_info_buffer = io.StringIO()
+        if hasattr(result, 'info'):
+            result.info(buf=result_info_buffer)
+            result_info = result_info_buffer.getvalue()
+        else:
+            result_info = f"类型: {type(result).__name__}\n形状: {getattr(result, 'shape', '标量')}"
+        
+        result_desc_prompt = f"""请对以下统计结果进行简要描述（100字以内）：
+
+原始数据信息:
+{data_info}
+
+{desc_text}
+
+统计代码: {code}
+
+统计结果信息:
+{result_info}
+
+描述要求：
+1. 结果整体意义
+2. 索引、值或各列的意义
+3. 简洁明了，不超过100字"""
+        
+        result_desc = call_openai_api("你是一个数据分析师，请用简洁的语言描述统计结果。", result_desc_prompt, temperature=0.3, max_tokens=200)
+        result_desc = result_desc.strip()
         
         return {
             'result': result,
             'code': code,
-            'raw_response': raw_response
+            'raw_response': raw_response,
+            'result_desc': result_desc
         }
     except Exception as e:
         print(f"代码执行失败: {str(e)}")
@@ -322,5 +359,6 @@ result = grouped['value'].mean()
             'result': None,
             'code': code,
             'error': str(e),
-            'raw_response': raw_response
+            'raw_response': raw_response,
+            'result_desc': ""
         }
