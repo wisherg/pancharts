@@ -151,6 +151,18 @@
                     <span class="info-label">文件路径:</span>
                     <span class="info-value">{{ record.file_path }}</span>
                 </div>
+                {% if record.data_desc %}
+                <div class="info-item" style="flex-basis: 100%;">
+                    <span class="info-label">数据描述:</span>
+                    <span class="info-value" style="font-family: inherit;">{{ record.data_desc }}</span>
+                </div>
+                {% endif %}
+                {% if record.data_insight %}
+                <div class="info-item" style="flex-basis: 100%;">
+                    <span class="info-label">数据洞察:</span>
+                    <span class="info-value" style="font-family: inherit;">{{ record.data_insight }}</span>
+                </div>
+                {% endif %}
             </div>
         </div>
         
