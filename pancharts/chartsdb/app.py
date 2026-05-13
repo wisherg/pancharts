@@ -293,7 +293,8 @@ async def edit_record(request: Request, record_id: int):
 
 @app.post("/update/{record_id}")
 async def update_record(record_id: int, tag0: str = Form(""), tag1: str = Form(""), 
-                       option: str = Form(""), data_option: str = Form("")):
+                       option: str = Form(""), data_option: str = Form(""),
+                       data_desc: str = Form(""), data_insight: str = Form("")):
     """更新记录"""
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -325,8 +326,8 @@ async def update_record(record_id: int, tag0: str = Form(""), tag1: str = Form("
     new_data_option = data_option if data_option else record["data_option"]
     
     cursor.execute('''
-        UPDATE pancharts_options SET tag0 = ?, tag1 = ?, option = ?, data_option = ? WHERE id = ?
-    ''', (tag0, tag1, new_option, new_data_option, record_id))
+        UPDATE pancharts_options SET tag0 = ?, tag1 = ?, option = ?, data_option = ?, data_desc = ?, data_insight = ? WHERE id = ?
+    ''', (tag0, tag1, new_option, new_data_option, data_desc, data_insight, record_id))
     
     conn.commit()
     conn.close()
@@ -475,6 +476,7 @@ async def stats_data_api(request: Request):
     """API接口 - 使用data_chat函数进行数据统计分析"""
     from fastapi.responses import JSONResponse
     import json
+    import numpy as np
     
     try:
         import pandas as pd
@@ -483,13 +485,14 @@ async def stats_data_api(request: Request):
         data = await request.json()
         raw_data = data.get("data", [])
         requirement = data.get("requirement", "")
+        data_desc = data.get("data_desc", "")
         
         if not raw_data or not requirement:
             return JSONResponse(content={"success": False, "error": "数据或统计需求不能为空"})
         
         df = pd.DataFrame(raw_data)
         
-        result = data_chat(df, requirement)
+        result = data_chat(df, requirement, data_desc)
         
         raw_response = str(result.get('raw_response', '')) if result.get('raw_response') else ''
         
@@ -510,25 +513,62 @@ async def stats_data_api(request: Request):
                 "raw_response": raw_response
             })
         
+        def replace_nan(value):
+            if isinstance(value, float) and np.isnan(value):
+                return None
+            if isinstance(value, list):
+                return [replace_nan(v) for v in value]
+            if isinstance(value, dict):
+                return {k: replace_nan(v) for k, v in value.items()}
+            return value
+        
+        index_info = None
+        
         if isinstance(stats_result, pd.DataFrame):
-            result_data = stats_result.to_dict('records')
+            result_data = stats_result.replace({np.nan: None}).to_dict('records')
             row_count = len(result_data)
             col_count = len(result_data[0]) if result_data else 0
             data_type = 'dataframe'
+            index_info = {
+                'has_index': not stats_result.index.equals(pd.RangeIndex(len(stats_result))),
+                'index_name': stats_result.index.name,
+                'index_values': stats_result.index.tolist(),
+                'columns': stats_result.columns.tolist(),
+                'is_multi_index': isinstance(stats_result.index, pd.MultiIndex),
+                'index_levels': stats_result.index.nlevels if isinstance(stats_result.index, pd.MultiIndex) else 1,
+                'index_names': list(stats_result.index.names) if isinstance(stats_result.index, pd.MultiIndex) else [stats_result.index.name]
+            }
         elif isinstance(stats_result, pd.Series):
+            index_data = stats_result.index.tolist()
+            if isinstance(stats_result.index, pd.MultiIndex):
+                index_data = [list(idx) for idx in stats_result.index]
+            
             result_data = {
-                'index': stats_result.index.tolist(),
-                'values': stats_result.values.tolist(),
-                'name': stats_result.name
+                'index': index_data,
+                'values': replace_nan(stats_result.values.tolist()),
+                'name': stats_result.name,
+                'is_multi_index': isinstance(stats_result.index, pd.MultiIndex),
+                'index_names': list(stats_result.index.names) if isinstance(stats_result.index, pd.MultiIndex) else None
             }
             row_count = len(stats_result)
             col_count = 1
             data_type = 'series'
+            # 为Series也添加index_info
+            index_info = {
+                'has_index': not stats_result.index.equals(pd.RangeIndex(len(stats_result))),
+                'index_name': stats_result.index.name,
+                'index_values': stats_result.index.tolist(),
+                'is_multi_index': isinstance(stats_result.index, pd.MultiIndex),
+                'index_levels': stats_result.index.nlevels if isinstance(stats_result.index, pd.MultiIndex) else 1,
+                'index_names': list(stats_result.index.names) if isinstance(stats_result.index, pd.MultiIndex) else [stats_result.index.name],
+                'series_name': stats_result.name
+            }
         else:
             result_data = [{"result": str(stats_result)}]
             row_count = 1
             col_count = 1
             data_type = 'other'
+            index_info = None
         
         return JSONResponse(content={
             "success": True,
@@ -537,7 +577,9 @@ async def stats_data_api(request: Request):
             "row_count": row_count,
             "col_count": col_count,
             "data_type": data_type,
-            "raw_response": raw_response
+            "raw_response": raw_response,
+            "result_desc": result.get('result_desc', ''),
+            "index_info": index_info
         })
         
     except Exception as e:
@@ -548,6 +590,7 @@ async def stats_data_api(request: Request):
 async def stats_data_full_api(
     file: UploadFile = File(...),
     requirement: str = Form(""),
+    data_desc: str = Form(""),
     read_func: str = Form("auto"),
     sep: str = Form(","),
     encoding: str = Form("utf-8"),
@@ -603,7 +646,7 @@ async def stats_data_full_api(
         else:
             df = pd.read_csv(io.StringIO(content.decode(encoding)), **read_kwargs)
         
-        result = data_chat(df, requirement)
+        result = data_chat(df, requirement, data_desc)
         
         raw_response = str(result.get('raw_response', '')) if result.get('raw_response') else ''
         
@@ -624,25 +667,62 @@ async def stats_data_full_api(
                 "raw_response": raw_response
             })
         
+        def replace_nan(value):
+            if isinstance(value, float) and np.isnan(value):
+                return None
+            if isinstance(value, list):
+                return [replace_nan(v) for v in value]
+            if isinstance(value, dict):
+                return {k: replace_nan(v) for k, v in value.items()}
+            return value
+        
+        index_info = None
+        
         if isinstance(stats_result, pd.DataFrame):
-            result_data = stats_result.to_dict('records')
+            result_data = stats_result.replace({np.nan: None}).to_dict('records')
             row_count = len(result_data)
             col_count = len(result_data[0]) if result_data else 0
             data_type = 'dataframe'
+            index_info = {
+                'has_index': not stats_result.index.equals(pd.RangeIndex(len(stats_result))),
+                'index_name': stats_result.index.name,
+                'index_values': stats_result.index.tolist(),
+                'columns': stats_result.columns.tolist(),
+                'is_multi_index': isinstance(stats_result.index, pd.MultiIndex),
+                'index_levels': stats_result.index.nlevels if isinstance(stats_result.index, pd.MultiIndex) else 1,
+                'index_names': list(stats_result.index.names) if isinstance(stats_result.index, pd.MultiIndex) else [stats_result.index.name]
+            }
         elif isinstance(stats_result, pd.Series):
+            index_data = stats_result.index.tolist()
+            if isinstance(stats_result.index, pd.MultiIndex):
+                index_data = [list(idx) for idx in stats_result.index]
+            
             result_data = {
-                'index': stats_result.index.tolist(),
-                'values': stats_result.values.tolist(),
-                'name': stats_result.name
+                'index': index_data,
+                'values': replace_nan(stats_result.values.tolist()),
+                'name': stats_result.name,
+                'is_multi_index': isinstance(stats_result.index, pd.MultiIndex),
+                'index_names': list(stats_result.index.names) if isinstance(stats_result.index, pd.MultiIndex) else None
             }
             row_count = len(stats_result)
             col_count = 1
             data_type = 'series'
+            # 为Series也添加index_info
+            index_info = {
+                'has_index': not stats_result.index.equals(pd.RangeIndex(len(stats_result))),
+                'index_name': stats_result.index.name,
+                'index_values': stats_result.index.tolist(),
+                'is_multi_index': isinstance(stats_result.index, pd.MultiIndex),
+                'index_levels': stats_result.index.nlevels if isinstance(stats_result.index, pd.MultiIndex) else 1,
+                'index_names': list(stats_result.index.names) if isinstance(stats_result.index, pd.MultiIndex) else [stats_result.index.name],
+                'series_name': stats_result.name
+            }
         else:
             result_data = [{"result": str(stats_result)}]
             row_count = 1
             col_count = 1
             data_type = 'other'
+            index_info = None
         
         return JSONResponse(content={
             "success": True,
@@ -651,11 +731,13 @@ async def stats_data_full_api(
             "row_count": row_count,
             "col_count": col_count,
             "data_type": data_type,
-            "raw_response": raw_response
+            "raw_response": raw_response,
+            "result_desc": result.get('result_desc', ''),
+            "index_info": index_info
         })
         
     except Exception as e:
-        return JSONResponse(content={"success": False, "error": f"统计分析失败: {str(e)}"})
+        return JSONResponse(content={"success": False, "error": f"统计分析失败: {str(e)}", "raw_response": ""})
 
 
 @app.post("/api/read-data")
@@ -682,6 +764,13 @@ async def read_data_api(
         
         content = await file.read()
         filename = file.filename
+        
+        upload_dir = os.path.join(os.path.dirname(get_db_path()), "uploads")
+        os.makedirs(upload_dir, exist_ok=True)
+        
+        server_path = os.path.join(upload_dir, filename)
+        with open(server_path, 'wb') as f:
+            f.write(content)
         
         read_kwargs = {}
         
@@ -749,7 +838,8 @@ async def read_data_api(
             "data": preview_data,
             "row_count": len(df),
             "col_count": len(df.columns),
-            "filename": filename
+            "filename": filename,
+            "server_path": server_path
         })
         
     except Exception as e:
@@ -774,17 +864,29 @@ async def get_data_info_api(request: Request):
         data = await request.json()
         raw_data = data.get("data", [])
         data_type = data.get("data_type", "dataframe")
+        index_info = data.get("index_info", None)
         
         if not raw_data:
             return JSONResponse(content={"success": False, "error": "数据为空"})
         
         if data_type == 'series':
             if isinstance(raw_data, dict) and 'values' in raw_data and 'index' in raw_data:
-                vis_data = pd.Series(raw_data.get('values', []), index=raw_data.get('index', []), name=raw_data.get('name'))
+                if raw_data.get('is_multi_index') and raw_data.get('index_names'):
+                    index_tuples = [tuple(idx) for idx in raw_data.get('index', [])]
+                    vis_data = pd.Series(raw_data.get('values', []), index=pd.MultiIndex.from_tuples(index_tuples, names=raw_data.get('index_names')), name=raw_data.get('name'))
+                else:
+                    vis_data = pd.Series(raw_data.get('values', []), index=raw_data.get('index', []), name=raw_data.get('name'))
             else:
                 df = pd.DataFrame(raw_data)
                 if len(df.columns) >= 2:
-                    vis_data = pd.Series(df.iloc[:, 1].values, index=df.iloc[:, 0], name=df.columns[1])
+                    # 检查是否有索引信息
+                    if index_info and index_info.get('is_multi_index') and index_info.get('index_levels') and index_info.get('index_levels') > 1:
+                        # 使用index_info中的索引信息
+                        index_tuples = [tuple(idx) for idx in index_info.get('index_values')]
+                        vis_data = pd.Series(df.iloc[:, -1].values, index=pd.MultiIndex.from_tuples(index_tuples, names=index_info.get('index_names')), name=df.columns[-1])
+                    else:
+                        # 对于普通情况，使用前两列
+                        vis_data = pd.Series(df.iloc[:, 1].values, index=df.iloc[:, 0], name=df.columns[1])
                 elif len(df.columns) == 1:
                     vis_data = pd.Series(df.iloc[:, 0].values, name=df.columns[0])
                 else:
@@ -792,6 +894,8 @@ async def get_data_info_api(request: Request):
             df = vis_data.to_frame()
         else:
             df = pd.DataFrame(raw_data)
+            if index_info and index_info.get('has_index') and index_info.get('index_values'):
+                df.index = pd.Index(index_info.get('index_values'), name=index_info.get('index_name'))
         
         buffer = io.StringIO()
         df.info(buf=buffer)
@@ -822,6 +926,8 @@ async def create_visualization_api(request: Request):
         method = data.get("method")
         raw_data = data.get("data", [])
         data_type = data.get("data_type", "dataframe")
+        reconstruct_type = data.get("reconstruct_type", "dataframe")
+        index_columns = data.get("index_columns", [])
         params = data.get("params", {})
         
         if not vis_class or not method or not raw_data:
@@ -841,28 +947,64 @@ async def create_visualization_api(request: Request):
         if vis_class not in class_map:
             return JSONResponse(content={"success": False, "error": f"未知的可视化类: {vis_class}"})
         
-        if data_type == 'series':
-            if isinstance(raw_data, dict) and 'values' in raw_data and 'index' in raw_data:
-                vis_data = pd.Series(raw_data.get('values', []), index=raw_data.get('index', []), name=raw_data.get('name'))
-            else:
-                df = pd.DataFrame(raw_data)
-                if len(df.columns) >= 2:
-                    vis_data = pd.Series(df.iloc[:, 1].values, index=df.iloc[:, 0], name=df.columns[1])
-                elif len(df.columns) == 1:
-                    vis_data = pd.Series(df.iloc[:, 0].values, name=df.columns[0])
-                else:
-                    return JSONResponse(content={"success": False, "error": "数据为空"})
-        else:
-            df = pd.DataFrame(raw_data)
+        index_info = data.get("index_info", None)
+        
+        # 数据重构步骤
+        # 创建DataFrame
+        df = pd.DataFrame(raw_data)
+        
+        # 设置索引
+        if index_columns:
+            # 检查索引列是否存在
+            missing_columns = []
+            for col in index_columns:
+                if col not in df.columns:
+                    missing_columns.append(col)
             
+            if missing_columns:
+                # 检查是否这些列是索引列
+                if index_info and index_info.get('has_index'):
+                    # 如果index_info中包含这些列作为索引，直接使用index_info中的索引
+                    if index_info.get('is_multi_index') and index_info.get('index_names'):
+                        # 多重索引
+                        index_tuples = [tuple(idx) for idx in index_info.get('index_values')]
+                        df.index = pd.MultiIndex.from_tuples(index_tuples, names=index_info.get('index_names'))
+                    else:
+                        # 单重索引
+                        df.index = pd.Index(index_info.get('index_values'), name=index_info.get('index_name'))
+                else:
+                    return JSONResponse(content={"success": False, "error": f"索引列 '{missing_columns[0]}' 不存在"})
+            else:
+                # 所有索引列都存在，直接设置
+                df.set_index(index_columns, inplace=True)
+        
+        # 根据重构类型处理
+        if reconstruct_type == "series":
+            # 对于Series，使用第一列作为值
+            if len(df.columns) == 0:
+                return JSONResponse(content={"success": False, "error": "数据框没有列"})
+            vis_data = df.iloc[:, 0]
+        else:
+            # 对于DataFrame，根据可视化类处理
             if vis_class == 'k_v':
                 if len(df.columns) == 0:
                     return JSONResponse(content={"success": False, "error": "数据为空"})
-                vis_data = df.iloc[:, 0]
+                # 确保使用df的索引，而不是重新创建
+                vis_data = pd.Series(df.iloc[:, 0].values, index=df.index, name=df.columns[0])
             elif vis_class == 'km_nv':
                 if len(df.columns) >= 2:
-                    index = pd.MultiIndex.from_product([df.iloc[:, 0], df.iloc[:, 1]])
-                    vis_data = pd.Series(df.iloc[:, 2].values, index=index) if len(df.columns) > 2 else pd.Series([1]*len(df), index=index)
+                    # 处理任意级别的多重索引
+                    # 假设前n-1列是索引，最后一列是值
+                    if len(df.columns) > 2:
+                        # 对于多重索引，使用所有列除了最后一列作为索引
+                        index_cols = df.columns[:-1]
+                        index_tuples = list(zip(*[df[col] for col in index_cols]))
+                        index = pd.MultiIndex.from_tuples(index_tuples)
+                        vis_data = pd.Series(df.iloc[:, -1].values, index=index)
+                    else:
+                        # 对于双重索引，使用前两列作为索引
+                        index = pd.MultiIndex.from_tuples(list(zip(df.iloc[:, 0], df.iloc[:, 1])))
+                        vis_data = pd.Series([1]*len(df), index=index)
                 else:
                     vis_data = df.iloc[:, 0]
             elif vis_class == 'k2_nv':
@@ -899,7 +1041,11 @@ async def create_visualization_api(request: Request):
         import io
         buffer = io.StringIO()
         if isinstance(vis_data, pd.Series):
-            vis_data.to_frame().info(buf=buffer)
+            buffer.write(f"<class 'pandas.core.series.Series'>\n")
+            buffer.write(f"Index: {len(vis_data)} entries, {vis_data.index[0]} to {vis_data.index[-1]}\n" if len(vis_data) > 0 else f"Index: 0 entries\n")
+            buffer.write(f"Series name: {vis_data.name}\n")
+            buffer.write(f"dtype: {vis_data.dtype}\n")
+            buffer.write(f"memory usage: {vis_data.memory_usage()} bytes\n")
         else:
             vis_data.info(buf=buffer)
         data_info = buffer.getvalue()
@@ -909,7 +1055,8 @@ async def create_visualization_api(request: Request):
             "option": chart.option,
             "chart_html": emb_result["html"],
             "js_dependencies": emb_result["js_dependencies"],
-            "data_info": data_info
+            "data_info": data_info,
+            "data_config": chart.data_config if hasattr(chart, 'data_config') else {}
         })
         
     except Exception as e:
@@ -949,9 +1096,12 @@ async def save_chart_api(request: Request):
     try:
         data = await request.json()
         option_text = data.get("option", "")
+        data_option_text = data.get("data_option", "")
         tag0 = data.get("tag0", "")
         tag1 = data.get("tag1", "")
         file_path = data.get("file_path", "")
+        data_desc = data.get("data_desc", "")
+        data_insight = data.get("data_insight", "")
         
         if not option_text:
             return JSONResponse(content={"success": False, "error": "Option为空"})
@@ -961,15 +1111,21 @@ async def save_chart_api(request: Request):
         except json.JSONDecodeError:
             return JSONResponse(content={"success": False, "error": "Option格式错误"})
         
+        if data_option_text:
+            try:
+                json.loads(data_option_text)
+            except json.JSONDecodeError:
+                return JSONResponse(content={"success": False, "error": "Data Option格式错误"})
+        
         conn = get_db_connection()
         cursor = conn.cursor()
         
         insert_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
         cursor.execute('''
-            INSERT INTO pancharts_options (insert_time, option, data_option, file_path, tag0, tag1)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (insert_time, option_text, "", file_path, tag0, tag1))
+            INSERT INTO pancharts_options (insert_time, option, data_option, file_path, tag0, tag1, data_desc, data_insight)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (insert_time, option_text, data_option_text, file_path, tag0, tag1, data_desc, data_insight))
         
         record_id = cursor.lastrowid
         conn.commit()
@@ -979,6 +1135,359 @@ async def save_chart_api(request: Request):
         
     except Exception as e:
         return JSONResponse(content={"success": False, "error": f"保存失败: {str(e)}"})
+
+
+@app.post("/api/save-data-desc")
+async def save_data_desc_api(request: Request):
+    """API接口 - 保存数据配置到data_desc表"""
+    import pickle
+    
+    try:
+        data = await request.json()
+        file_path = data.get("file_path", "")
+        file_suffix = data.get("file_suffix", "")
+        read_config = data.get("read_config", {})
+        desc = data.get("desc", "")
+        
+        if not file_path or not file_suffix:
+            return JSONResponse(content={"success": False, "error": "文件路径和后缀不能为空"})
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT id FROM data_desc WHERE file_path = ?', (file_path,))
+        existing_record = cursor.fetchone()
+        
+        if existing_record:
+            conn.close()
+            return JSONResponse(content={"success": False, "error": "该文件路径已存在记录", "duplicate": True})
+        
+        read_config_pickle = pickle.dumps(read_config)
+        insert_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        cursor.execute('''
+            INSERT INTO data_desc (file_path, file_suffix, read_config, desc, insert_time)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (file_path, file_suffix, read_config_pickle, desc, insert_time))
+        
+        record_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        
+        return JSONResponse(content={"success": True, "id": record_id})
+        
+    except Exception as e:
+        return JSONResponse(content={"success": False, "error": f"保存失败: {str(e)}"})
+
+
+@app.get("/api/get-data-desc-list")
+async def get_data_desc_list_api():
+    """API接口 - 获取所有数据配置记录"""
+    import pickle
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT id, file_path, file_suffix, read_config, desc, insert_time FROM data_desc ORDER BY insert_time DESC')
+        records = cursor.fetchall()
+        
+        result = []
+        for record in records:
+            id_, file_path, file_suffix, read_config_pickle, desc, insert_time = record
+            try:
+                read_config = pickle.loads(read_config_pickle)
+            except:
+                read_config = {}
+            
+            result.append({
+                "id": id_,
+                "file_path": file_path,
+                "file_suffix": file_suffix,
+                "read_config": read_config,
+                "desc": desc,
+                "insert_time": insert_time
+            })
+        
+        conn.close()
+        
+        return JSONResponse(content={"success": True, "data": result})
+        
+    except Exception as e:
+        return JSONResponse(content={"success": False, "error": f"获取失败: {str(e)}"})
+
+
+@app.get("/api/get-data-desc/{record_id}")
+async def get_data_desc_api(record_id: int):
+    """API接口 - 获取单个数据配置记录"""
+    import pickle
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT id, file_path, file_suffix, read_config, desc, insert_time FROM data_desc WHERE id = ?', (record_id,))
+        record = cursor.fetchone()
+        
+        if not record:
+            return JSONResponse(content={"success": False, "error": "记录不存在"})
+        
+        id_, file_path, file_suffix, read_config_pickle, desc, insert_time = record
+        try:
+            read_config = pickle.loads(read_config_pickle)
+        except:
+            read_config = {}
+        
+        conn.close()
+        
+        return JSONResponse(content={
+            "success": True,
+            "data": {
+                "id": id_,
+                "file_path": file_path,
+                "file_suffix": file_suffix,
+                "read_config": read_config,
+                "desc": desc,
+                "insert_time": insert_time
+            }
+        })
+        
+    except Exception as e:
+        return JSONResponse(content={"success": False, "error": f"获取失败: {str(e)}"})
+
+
+
+
+
+@app.post("/api/read-data-by-path")
+async def read_data_by_path_api(request: Request):
+    """API接口 - 通过文件路径直接读取数据"""
+    import pandas as pd
+    import io
+    
+    try:
+        data = await request.json()
+        file_path = data.get("file_path", "")
+        file_suffix = data.get("file_suffix", "")
+        read_config = data.get("read_config", {})
+        
+        if not file_path:
+            return JSONResponse(content={"success": False, "error": "文件路径不能为空"})
+        
+        if not os.path.exists(file_path):
+            return JSONResponse(content={"success": False, "error": f"文件不存在: {file_path}"})
+        
+        read_kwargs = {}
+        if read_config.get('sep'):
+            if read_config['sep'] == '\\t':
+                read_kwargs['sep'] = '\t'
+            else:
+                read_kwargs['sep'] = read_config['sep']
+        if read_config.get('encoding'):
+            read_kwargs['encoding'] = read_config['encoding']
+        if read_config.get('header') is not None:
+            header_val = read_config['header']
+            if header_val == '-1':
+                read_kwargs['header'] = None
+            else:
+                read_kwargs['header'] = int(header_val)
+        if read_config.get('names'):
+            names = [n.strip() for n in read_config['names'].split('\n') if n.strip()]
+            if names:
+                read_kwargs['names'] = names
+        if read_config.get('nrows'):
+            read_kwargs['nrows'] = int(read_config['nrows'])
+        if read_config.get('skiprows'):
+            read_kwargs['skiprows'] = int(read_config['skiprows'])
+        if read_config.get('skipfooter'):
+            read_kwargs['skipfooter'] = int(read_config['skipfooter'])
+        if read_config.get('usecols'):
+            read_kwargs['usecols'] = [c.strip() for c in read_config['usecols'].split(',') if c.strip()]
+        if read_config.get('index_col'):
+            read_kwargs['index_col'] = read_config['index_col']
+        if read_config.get('parse_dates'):
+            read_kwargs['parse_dates'] = [c.strip() for c in read_config['parse_dates'].split(',') if c.strip()]
+        if read_config.get('na_values'):
+            read_kwargs['na_values'] = [v.strip() for v in read_config['na_values'].split(',') if v.strip()]
+        if read_config.get('skip_blank_lines') is not None:
+            read_kwargs['skip_blank_lines'] = read_config['skip_blank_lines']
+        
+        if file_suffix in ['xls', 'xlsx']:
+            df = pd.read_excel(file_path, **read_kwargs)
+        else:
+            df = pd.read_csv(file_path, **read_kwargs)
+        
+        row_count = df.shape[0]
+        col_count = df.shape[1]
+        
+        data_list = df.replace({float('nan'): None, 'nan': None}).to_dict(orient='records')
+        
+        return JSONResponse(content={
+            "success": True,
+            "data": data_list,
+            "row_count": row_count,
+            "col_count": col_count,
+            "file_name": os.path.basename(file_path)
+        })
+        
+    except Exception as e:
+        return JSONResponse(content={"success": False, "error": f"读取失败: {str(e)}"})
+
+
+@app.get("/api/data-desc-list")
+async def get_data_desc_list(
+    file_path: str = "",
+    file_suffix: str = "",
+    desc: str = "",
+    start_time: str = "",
+    end_time: str = ""
+):
+    """获取data_desc表记录列表"""
+    import pickle
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        where_clauses = []
+        params = []
+        
+        if file_path:
+            where_clauses.append("file_path LIKE ?")
+            params.append(f"%{file_path}%")
+        
+        if file_suffix:
+            where_clauses.append("file_suffix = ?")
+            params.append(file_suffix)
+        
+        if desc:
+            where_clauses.append("desc LIKE ?")
+            params.append(f"%{desc}%")
+        
+        if start_time:
+            where_clauses.append("insert_time >= ?")
+            params.append(start_time)
+        
+        if end_time:
+            where_clauses.append("insert_time <= ?")
+            params.append(end_time)
+        
+        query = "SELECT * FROM data_desc"
+        if where_clauses:
+            query += " WHERE " + " AND ".join(where_clauses)
+        query += " ORDER BY id DESC"
+        
+        cursor.execute(query, params)
+        records = cursor.fetchall()
+        
+        result = []
+        for record in records:
+            try:
+                read_config = pickle.loads(record["read_config"])
+            except:
+                read_config = {}
+            
+            result.append({
+                "id": record["id"],
+                "file_path": record["file_path"],
+                "file_suffix": record["file_suffix"],
+                "read_config": read_config,
+                "desc": record["desc"],
+                "insert_time": record["insert_time"]
+            })
+        
+        conn.close()
+        
+        return JSONResponse(content={"success": True, "data": result})
+        
+    except Exception as e:
+        return JSONResponse(content={"success": False, "error": f"获取失败: {str(e)}"})
+
+
+@app.get("/data-desc-edit/{record_id}", response_class=HTMLResponse)
+async def data_desc_edit(request: Request, record_id: int):
+    """数据描述编辑页面"""
+    template = jinja_env.get_template("data_desc_edit.html")
+    html_content = template.render({
+        "request": request,
+        "record_id": record_id
+    })
+    return HTMLResponse(content=html_content)
+
+
+@app.get("/api/data-desc/{record_id}")
+async def get_data_desc(record_id: int):
+    """获取单个data_desc记录详情"""
+    import pickle
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT * FROM data_desc WHERE id = ?", (record_id,))
+        record = cursor.fetchone()
+        
+        if not record:
+            return JSONResponse(content={"success": False, "error": "记录不存在"})
+        
+        try:
+            read_config = pickle.loads(record["read_config"])
+        except:
+            read_config = {}
+        
+        conn.close()
+        
+        return JSONResponse(content={
+            "success": True,
+            "data": {
+                "id": record["id"],
+                "file_path": record["file_path"],
+                "file_suffix": record["file_suffix"],
+                "read_config": read_config,
+                "desc": record["desc"],
+                "insert_time": record["insert_time"]
+            }
+        })
+        
+    except Exception as e:
+        return JSONResponse(content={"success": False, "error": f"获取失败: {str(e)}"})
+
+
+@app.put("/api/data-desc/{record_id}")
+async def update_data_desc(record_id: int, request: Request):
+    """更新data_desc记录"""
+    try:
+        data = await request.json()
+        new_desc = data.get("desc", "")
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("UPDATE data_desc SET desc = ? WHERE id = ?", (new_desc, record_id))
+        conn.commit()
+        conn.close()
+        
+        return JSONResponse(content={"success": True})
+        
+    except Exception as e:
+        return JSONResponse(content={"success": False, "error": f"更新失败: {str(e)}"})
+
+
+@app.delete("/api/data-desc/{record_id}")
+async def delete_data_desc(record_id: int):
+    """删除data_desc记录"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("DELETE FROM data_desc WHERE id = ?", (record_id,))
+        conn.commit()
+        conn.close()
+        
+        return JSONResponse(content={"success": True})
+        
+    except Exception as e:
+        return JSONResponse(content={"success": False, "error": f"删除失败: {str(e)}"})
 
 
 if __name__ == "__main__":
