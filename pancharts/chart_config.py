@@ -20,6 +20,8 @@ AMAP_MAP_API_KEY = ""
 # OpenCage API配置 https://opencagedata.com/
 OPENCAGE_API_KEY = ""
 
+#sqlite数据库保存目录
+SQLITE_DB_PATH = ""
 
 # node_modules文件夹的绝对地址
 NODE_MODULES_PATH = None
