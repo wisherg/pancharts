@@ -1,3 +1,13 @@
+# 包含所有模板文件
 include pancharts/templates/*.html
-include pancharts/datasets/*.csv
+
+# 包含数据集文件
 include pancharts/datasets/*.json
+include pancharts/datasets/*.md
+
+# 包含 chartsdb 模板文件
+include pancharts/chartsdb/templates/*.html
+
+# 包含 README 和 LICENSE
+include README.md
+include LICENSE
