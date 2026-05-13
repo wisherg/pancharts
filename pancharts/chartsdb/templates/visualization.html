@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数据可视化 - Pancharts</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f7fa;
+            min-height: 100vh;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+        }
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+        .card {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .card-header h2 {
+            font-size: 18px;
+            color: #333;
+        }
+        .info-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            align-items: center;
+        }
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+            min-width: 80px;
+        }
+        .info-item {
+            display: flex;
+            align-items: center;
+        }
+        .info-label {
+            font-weight: 600;
+            color: #666;
+            margin-right: 5px;
+        }
+        .info-value {
+            color: #333;
+            font-family: monospace;
+        }
+        .code-block {
+            background: #f8f9fa;
+            border-radius: 4px;
+            padding: 15px;
+            overflow-x: auto;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            color: #333;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            min-height: 200px;
+        }
+        .form-control {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            min-height: 200px;
+            resize: vertical;
+        }
+        .tag-input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .back-link {
+            margin-bottom: 20px;
+        }
+        .chart-container {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            padding: 20px;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #333;
+        }
+        .preview-note {
+            background: #fff3cd;
+            border: 1px solid #ffeeba;
+            border-radius: 4px;
+            padding: 10px;
+            margin-bottom: 15px;
+            font-size: 14px;
+            color: #856404;
+        }
+        .options-container {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+        }
+        .option-panel {
+            flex: 1;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            padding: 20px;
+        }
+        .option-panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .option-panel h2 {
+            font-size: 18px;
+            color: #333;
+        }
+        .transfer-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 10px;
+            min-width: 80px;
+        }
+        .ai-prompt-section {
+            margin-top: 15px;
+        }
+        .ai-prompt-section textarea {
+            width: 100%;
+            min-height: 80px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            resize: vertical;
+            margin-bottom: 10px;
+        }
+        .ai-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .loading-indicator {
+            display: none;
+            color: #667eea;
+            font-size: 14px;
+        }
+        .error-message {
+            color: #dc3545;
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 4px;
+            padding: 10px;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+        .success-message {
+            color: #155724;
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-radius: 4px;
+            padding: 10px;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+        .form-row {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 15px;
+        }
+        .form-row .form-group {
+            flex: 1;
+            margin-bottom: 0;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="back-link">
+            <a href="/data-reader" class="btn btn-secondary">← 返回数据读取</a>
+        </div>
+        
+        <div class="card">
+            <div class="info-grid">
+                <span class="card-title">数据信息</span>
+                <div class="info-item">
+                    <span class="info-label">文件名:</span>
+                    <span class="info-value" id="data-file-name">加载中...</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">数据量:</span>
+                    <span class="info-value" id="data-size">-</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">类型:</span>
+                    <span class="info-value" id="data-type">-</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h2>数据信息详情</h2>
+            </div>
+            <pre id="data-info-content" class="code-block" style="min-height: 150px;"></pre>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h2>选择可视化</h2>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="vis-class">可视化类</label>
+                    <select id="vis-class" class="tag-input" onchange="updateMethods()">
+                        <option value="">请选择</option>
+                        <option value="k_v">k_v - 单列索引序列数据</option>
+                        <option value="km_nv">km_nv - 多列索引单列数值</option>
+                        <option value="k2_nv">k2_nv - 双层索引单列数值</option>
+                        <option value="k_vm">k_vm - 单列索引多列数值</option>
+                        <option value="gk_vm">gk_vm - 地理数据可视化</option>
+                        <option value="gk_vm_amap">gk_vm_amap - 高德地图可视化</option>
+                        <option value="gk_vm_globe">gk_vm_globe - Globe地球可视化</option>
+                        <option value="sk_vm">sk_vm - 股票K线图</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="vis-method">可视化方法</label>
+                    <select id="vis-method" class="tag-input" onchange="updateParams()">
+                        <option value="">请先选择类</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div id="params-container" class="hidden">
+                <div class="card-header">
+                    <h2>参数配置</h2>
+                </div>
+                <div id="params-form"></div>
+            </div>
+            
+            <div style="margin-top: 15px; display: flex; gap: 10px;">
+                <button type="button" id="create-btn" class="btn btn-primary">实例化并可视化</button>
+            </div>
+        </div>
+        
+        <div id="visualization-result" class="hidden">
+            <div class="card">
+                <div class="card-header">
+                    <h2>图表预览</h2>
+                </div>
+                <div id="chart-preview-container"></div>
+                <div style="margin-top: 15px; display: flex; gap: 10px;">
+                    <button type="button" id="preview-btn" class="btn btn-primary" disabled>查看预览</button>
+                    <button type="button" id="reset-btn" class="btn btn-secondary">还原</button>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <h2>Option 配置</h2>
+                </div>
+                <div class="options-container">
+                    <div class="option-panel" style="display: flex; flex-direction: column; height: 100%; min-height: 550px;">
+                        <div class="option-panel-header">
+                            <h2>当前 Option</h2>
+                        </div>
+                        <div class="form-group" style="flex: 1;">
+                            <textarea id="option" class="form-control" style="height: 100%; min-height: 500px;" placeholder="输入ECharts配置"></textarea>
+                        </div>
+                    </div>
+                    
+                    <div class="transfer-section">
+                        <button type="button" id="transfer-btn" class="btn btn-primary" title="将右侧内容替换到左侧">← 替换</button>
+                    </div>
+                    
+                    <div class="option-panel" style="display: flex; flex-direction: column; height: 100%; min-height: 550px;">
+                        <div class="option-panel-header">
+                            <h2>AI 修改</h2>
+                        </div>
+                        <div class="ai-controls" style="margin-bottom: 10px;">
+                            <button type="button" id="ai-modify-btn" class="btn btn-primary">AI 修改</button>
+                            <button type="button" id="ai-preview-btn" class="btn btn-secondary">预览结果</button>
+                            <span id="loading-indicator" class="loading-indicator">修改中...</span>
+                        </div>
+                        <div class="ai-prompt-section" style="margin-bottom: 10px;">
+                            <textarea id="ai-prompt" style="min-height: 120px;" placeholder="输入修改指令，例如：&#10;- 调整标题为'销售报表'&#10;- 将颜色改为蓝色系&#10;- 添加数据缩放功能"></textarea>
+                        </div>
+                        <div id="ai-message" style="margin-bottom: 10px;"></div>
+                        <div class="form-group" style="flex: 1;">
+                            <textarea id="ai-option" class="form-control" style="height: 100%; min-height: 300px;" placeholder="AI 修改后的 Option 将显示在这里" readonly></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <h2>数据分析</h2>
+                </div>
+                <div class="ai-controls" style="margin-bottom: 10px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                    <button type="button" id="desc-chat-btn" class="btn btn-primary">生成分析</button>
+                    <button type="button" id="desc-copy-btn" class="btn btn-secondary">一键复制</button>
+                    <div style="display: flex; align-items: center; gap: 5px;">
+                        <label style="margin: 0;">输出字数:</label>
+                        <input type="number" id="desc-max-words" class="tag-input" style="width: 100px; padding: 5px;" value="500" min="50" max="2000">
+                    </div>
+                    <span id="desc-loading-indicator" class="loading-indicator">分析中...</span>
+                </div>
+                <div class="ai-prompt-section" style="margin-bottom: 10px;">
+                    <textarea id="desc-prompt" style="min-height: 100px;" placeholder="输入分析要求，例如：&#10;- 分析数据的趋势和特征&#10;- 找出数据中的关键指标&#10;- 分析数据的商业意义"></textarea>
+                </div>
+                <div id="desc-message" style="margin-bottom: 10px;"></div>
+                <div class="form-group">
+                    <textarea id="desc-result" class="form-control" style="min-height: 300px;" placeholder="分析结果将显示在这里"></textarea>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <h2>保存到数据库</h2>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="tag0">标签0</label>
+                        <input type="text" id="tag0" class="tag-input" placeholder="输入标签0">
+                    </div>
+                    <div class="form-group">
+                        <label for="tag1">标签1</label>
+                        <input type="text" id="tag1" class="tag-input" placeholder="输入标签1">
+                    </div>
+                </div>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <button type="button" id="save-btn" class="btn btn-primary">保存到数据库</button>
+                    <span id="save-loading-indicator" class="loading-indicator">保存中...</span>
+                </div>
+                <div id="save-message" style="margin-top: 10px;"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let visualizationData = null;
+        let currentChartOption = null;
+        let jsDependencies = [];
+        let originalOption = null;
+        let currentChart = null;
+        
+        const methodsMap = {
+            'k_v': ['bar', 'line', 'scatter', 'escatter', 'pie', 'funnel', 'wordcloud', 'calendar', 'map'],
+            'km_nv': ['sunburst', 'treemap', 'tree'],
+            'k2_nv': ['bar3d', 'graph', 'sankey', 'heatmap'],
+            'k_vm': ['parallel', 'radar', 'rect_plot'],
+            'gk_vm': ['scatter', 'escatter', 'heatmap', 'graph', 'bar3d', 'line3d'],
+            'gk_vm_amap': ['scatter', 'escatter', 'heatmap', 'graph', 'lines'],
+            'gk_vm_globe': ['scatter', 'bar3d', 'lines3d'],
+            'sk_vm': ['kline']
+        };
+
+        const paramsMap = {
+            'k_v': {
+                'map': ['map_name:str']
+            },
+            'km_nv': {
+                'treemap': ['num:int|可选'],
+                'tree': ['num:int|可选']
+            },
+            'k2_nv': {},
+            'k_vm': {
+                'rect_plot': ['series_type:str', 'encode_x:int|list', 'encode_y:int|list']
+            },
+            'gk_vm': {
+                'scatter': ['dimension:int|list|可选', 'visual_type:str|list|可选'],
+                'escatter': ['dimension:int|list|可选', 'visual_type:str|list|可选'],
+                'heatmap': ['dimension:int|list|可选', 'visual_type:str|list|可选'],
+                'graph': ['edges:list'],
+                'bar3d': ['dimension:int|list|可选', 'visual_type:str|list|可选'],
+                'line3d': ['coords:list']
+            },
+            'gk_vm_amap': {
+                'scatter': ['dimension:int|list|可选', 'visual_type:str|list|可选'],
+                'escatter': ['dimension:int|list|可选', 'visual_type:str|list|可选'],
+                'heatmap': ['dimension:int|list|可选', 'visual_type:str|list|可选'],
+                'graph': ['edges:list'],
+                'lines': ['coords:list']
+            },
+            'gk_vm_globe': {
+                'scatter': ['dimension:int|list|可选', 'visual_type:str|list|可选'],
+                'bar3d': ['dimension:int|list|可选', 'visual_type:str|list|可选'],
+                'lines3d': ['coords:list']
+            },
+            'sk_vm': {
+                'kline': ['ma:int|list|可选']
+            }
+        };
+        
+        document.addEventListener('DOMContentLoaded', async function() {
+            const dataStr = sessionStorage.getItem('visualizationData');
+            if (dataStr) {
+                visualizationData = JSON.parse(dataStr);
+                document.getElementById('data-file-name').textContent = visualizationData.fileName || '未知';
+                document.getElementById('data-size').textContent = 
+                    `${visualizationData.rowCount || '-'} 行 × ${visualizationData.colCount || '-'} 列`;
+                document.getElementById('data-type').textContent = 
+                    visualizationData.dataType === 'series' ? 'Series' : 'DataFrame';
+                
+                await loadDataInfo();
+            } else {
+                document.getElementById('data-file-name').textContent = '未找到数据';
+            }
+            
+            initEventListeners();
+        });
+        
+        async function loadDataInfo() {
+            if (!visualizationData) return;
+            
+            try {
+                const response = await fetch('/api/get-data-info', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        data: visualizationData.data,
+                        data_type: visualizationData.dataType || 'dataframe'
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    document.getElementById('data-info-content').textContent = result.data_info;
+                } else {
+                    document.getElementById('data-info-content').textContent = '获取数据信息失败: ' + result.error;
+                }
+            } catch (error) {
+                document.getElementById('data-info-content').textContent = '获取数据信息失败: ' + error.message;
+            }
+        }
+        
+        function initEventListeners() {
+            document.getElementById('create-btn').addEventListener('click', createVisualization);
+            document.getElementById('preview-btn').addEventListener('click', previewCurrentOption);
+            document.getElementById('reset-btn').addEventListener('click', resetToOriginal);
+            document.getElementById('ai-modify-btn').addEventListener('click', aiModifyOption);
+            document.getElementById('ai-preview-btn').addEventListener('click', previewAIResult);
+            document.getElementById('transfer-btn').addEventListener('click', transferOption);
+            document.getElementById('desc-chat-btn').addEventListener('click', descChat);
+            document.getElementById('desc-copy-btn').addEventListener('click', copyDescResult);
+            document.getElementById('save-btn').addEventListener('click', saveToDB);
+        }
+        
+        function updateMethods() {
+            const visClass = document.getElementById('vis-class').value;
+            const methodSelect = document.getElementById('vis-method');
+            methodSelect.innerHTML = '<option value="">请选择方法</option>';
+            
+            if (visClass && methodsMap[visClass]) {
+                methodsMap[visClass].forEach(method => {
+                    const option = document.createElement('option');
+                    option.value = method;
+                    option.textContent = method;
+                    methodSelect.appendChild(option);
+                });
+            }
+        }
+        
+        function updateParams() {
+            const visClass = document.getElementById('vis-class').value;
+            const method = document.getElementById('vis-method').value;
+            const paramsContainer = document.getElementById('params-container');
+            const paramsForm = document.getElementById('params-form');
+            
+            paramsForm.innerHTML = '';
+            
+            if (!visClass || !method) {
+                paramsContainer.classList.add('hidden');
+                return;
+            }
+            
+            const params = paramsMap[visClass]?.[method] || [];
+            
+            if (params.length > 0) {
+                params.forEach(param => {
+                    const parts = param.split(':');
+                    const paramName = parts[0];
+                    const paramType = parts[1];
+                    
+                    const formGroup = document.createElement('div');
+                    formGroup.className = 'form-group';
+                    
+                    const label = document.createElement('label');
+                    label.textContent = `${paramName} (${paramType})`;
+                    formGroup.appendChild(label);
+                    
+                    const input = document.createElement('input');
+                    input.type = 'text';
+                    input.id = `param-${paramName}`;
+                    input.className = 'tag-input';
+                    input.placeholder = `输入${paramName}`;
+                    formGroup.appendChild(input);
+                    
+                    paramsForm.appendChild(formGroup);
+                });
+            }
+            
+            paramsContainer.classList.remove('hidden');
+        }
+        
+        async function createVisualization() {
+            const visClass = document.getElementById('vis-class').value;
+            const method = document.getElementById('vis-method').value;
+            
+            if (!visClass || !method || !visualizationData) {
+                alert('请选择可视化类和方法，并确保已加载数据');
+                return;
+            }
+            
+            const params = {};
+            const methodParams = paramsMap[visClass]?.[method] || [];
+            methodParams.forEach(param => {
+                const paramName = param.split(':')[0];
+                const value = document.getElementById(`param-${paramName}`)?.value;
+                if (value) {
+                    try {
+                        params[paramName] = JSON.parse(value);
+                    } catch {
+                        params[paramName] = value;
+                    }
+                }
+            });
+            
+            try {
+                const response = await fetch('/api/create-visualization', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        vis_class: visClass,
+                        method: method,
+                        data: visualizationData.data,
+                        data_type: visualizationData.dataType || 'dataframe',
+                        params: params
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    currentChartOption = result.option;
+                    jsDependencies = result.js_dependencies || [];
+                    originalOption = JSON.parse(JSON.stringify(currentChartOption));
+                    
+                    document.getElementById('option').value = JSON.stringify(currentChartOption, null, 2);
+                    document.getElementById('ai-option').value = '';
+                    document.getElementById('ai-prompt').value = '';
+                    document.getElementById('ai-message').innerHTML = '';
+                    
+                    document.getElementById('visualization-result').classList.remove('hidden');
+                    
+                    loadScriptsAndRender(jsDependencies, currentChartOption);
+                    
+                    alert('可视化创建成功！');
+                } else {
+                    alert('创建可视化失败: ' + result.error);
+                }
+            } catch (error) {
+                alert('请求失败: ' + error.message);
+            }
+        }
+        
+        function loadScriptsAndRender(dependencies, option) {
+            const requiredScripts = dependencies || [];
+            
+            let loadedCount = 0;
+            const totalScripts = requiredScripts.length;
+            
+            const onAllLoaded = () => {
+                renderChart(option);
+            };
+            
+            if (totalScripts === 0) {
+                onAllLoaded();
+                return;
+            }
+            
+            requiredScripts.forEach(url => {
+                if (document.querySelector(`script[src="${url}"]`)) {
+                    loadedCount++;
+                    if (loadedCount >= totalScripts) {
+                        onAllLoaded();
+                    }
+                    return;
+                }
+                
+                const script = document.createElement('script');
+                script.src = url;
+                script.onload = () => {
+                    loadedCount++;
+                    if (loadedCount >= totalScripts) {
+                        onAllLoaded();
+                    }
+                };
+                script.onerror = () => {
+                    loadedCount++;
+                    if (loadedCount >= totalScripts) {
+                        onAllLoaded();
+                    }
+                };
+                document.head.appendChild(script);
+            });
+        }
+        
+        function renderChart(optionData) {
+            const container = document.getElementById('chart-preview-container');
+            
+            if (currentChart) {
+                if (currentChart._resizeHandler) {
+                    window.removeEventListener('resize', currentChart._resizeHandler);
+                }
+                currentChart.dispose();
+                currentChart = null;
+            }
+            
+            const desc = optionData.desc || '';
+            
+            let containerHtml = '<div style="display: flex; gap: 20px; align-items: flex-start;">';
+            containerHtml += '<div id="chart-preview-inner" style="width: 100%; height: 400px; flex: 1;"></div>';
+            
+            if (desc) {
+                containerHtml += '<div style="width: 300px; padding: 15px; background-color: #f9f9f9; border-radius: 8px; border-left: 4px solid #1890ff; font-size: 14px; line-height: 1.6; color: #333;">';
+                containerHtml += '<div style="font-weight: bold; font-size: 16px; margin-bottom: 10px; color: #1890ff;">图表说明</div>';
+                containerHtml += desc;
+                containerHtml += '</div>';
+            }
+            
+            containerHtml += '</div>';
+            container.innerHTML = containerHtml;
+            
+            const chartOption = JSON.parse(JSON.stringify(optionData));
+            delete chartOption.desc;
+            
+            const chartDom = document.getElementById('chart-preview-inner');
+            currentChart = echarts.init(chartDom);
+            currentChart.setOption(chartOption);
+            
+            const resizeHandler = function() {
+                currentChart.resize();
+            };
+            window.addEventListener('resize', resizeHandler);
+            currentChart._resizeHandler = resizeHandler;
+        }
+        
+        function previewCurrentOption() {
+            const optionText = document.getElementById('option').value;
+            if (!optionText.trim()) {
+                alert('Option 不能为空');
+                return;
+            }
+            
+            try {
+                const option = JSON.parse(optionText);
+                renderChart(option);
+                updatePreviewButton();
+                alert('预览成功！');
+            } catch(e) {
+                alert('预览失败: ' + e.message);
+            }
+        }
+        
+        function updatePreviewButton() {
+            const previewBtn = document.getElementById('preview-btn');
+            const aiOptionText = document.getElementById('ai-option').value.trim();
+            
+            if (aiOptionText) {
+                previewBtn.disabled = false;
+                previewBtn.style.background = 'linear-gradient(135deg, #28a745 0%, #218838 100%)';
+            } else {
+                previewBtn.disabled = true;
+                previewBtn.style.background = '';
+            }
+        }
+        
+        function resetToOriginal() {
+            if (confirm('确定要还原为原始版本吗？')) {
+                document.getElementById('option').value = JSON.stringify(originalOption, null, 2);
+                document.getElementById('ai-option').value = '';
+                document.getElementById('ai-prompt').value = '';
+                document.getElementById('ai-message').innerHTML = '';
+                
+                try {
+                    renderChart(originalOption);
+                } catch(e) {
+                    console.error('还原预览失败:', e);
+                }
+                
+                updatePreviewButton();
+                alert('已还原为原始版本');
+            }
+        }
+        
+        async function aiModifyOption() {
+            const optionText = document.getElementById('option').value;
+            const prompt = document.getElementById('ai-prompt').value;
+            const loadingIndicator = document.getElementById('loading-indicator');
+            const messageDiv = document.getElementById('ai-message');
+            
+            if (!optionText.trim()) {
+                alert('Option 不能为空');
+                return;
+            }
+            
+            if (!prompt.trim()) {
+                alert('请输入修改指令');
+                return;
+            }
+            
+            loadingIndicator.style.display = 'inline';
+            messageDiv.innerHTML = '';
+            
+            try {
+                const response = await fetch('/api/patch_option', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        option: optionText,
+                        prompt: prompt
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('ai-option').value = JSON.stringify(JSON.parse(data.patched_option), null, 2);
+                    messageDiv.innerHTML = '<div class="success-message">修改成功！可以预览效果或替换到左侧。</div>';
+                    updatePreviewButton();
+                } else {
+                    messageDiv.innerHTML = '<div class="error-message">修改失败: ' + (data.error || '未知错误') + '</div>';
+                }
+            } catch(e) {
+                messageDiv.innerHTML = '<div class="error-message">请求失败: ' + e.message + '</div>';
+            } finally {
+                loadingIndicator.style.display = 'none';
+            }
+        }
+        
+        async function previewAIResult() {
+            const aiOptionText = document.getElementById('ai-option').value;
+            if (!aiOptionText.trim()) {
+                alert('AI 修改结果为空，请先点击"AI 修改"按钮');
+                return;
+            }
+            
+            try {
+                const option = JSON.parse(aiOptionText);
+                renderChart(option);
+                alert('预览成功！');
+            } catch(e) {
+                alert('预览失败: ' + e.message);
+            }
+        }
+        
+        function transferOption() {
+            const aiOptionText = document.getElementById('ai-option').value;
+            if (!aiOptionText.trim()) {
+                alert('AI 修改结果为空，无需替换');
+                return;
+            }
+            
+            if (confirm('确定要将右侧 AI 修改结果替换到左侧吗？')) {
+                document.getElementById('option').value = aiOptionText;
+                updatePreviewButton();
+                alert('已替换！可以点击"查看预览"按钮预览效果。');
+            }
+        }
+        
+        async function descChat() {
+            const dataConfigText = JSON.stringify(visualizationData?.data || {});
+            const descPrompt = document.getElementById('desc-prompt').value;
+            const descMaxWords = document.getElementById('desc-max-words').value;
+            const loadingIndicator = document.getElementById('desc-loading-indicator');
+            const messageDiv = document.getElementById('desc-message');
+            
+            if (!dataConfigText.trim()) {
+                alert('数据配置不能为空');
+                return;
+            }
+            
+            if (!descPrompt.trim()) {
+                alert('请输入分析要求');
+                return;
+            }
+            
+            loadingIndicator.style.display = 'inline';
+            messageDiv.innerHTML = '';
+            
+            try {
+                const response = await fetch('/api/desc_chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        user_requirement: descPrompt,
+                        data_config: dataConfigText,
+                        max_words: parseInt(descMaxWords)
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('desc-result').value = data.result;
+                    messageDiv.innerHTML = '<div class="success-message">分析成功！可以手动修改结果或复制。</div>';
+                } else {
+                    messageDiv.innerHTML = '<div class="error-message">分析失败: ' + (data.error || '未知错误') + '</div>';
+                }
+            } catch(e) {
+                messageDiv.innerHTML = '<div class="error-message">请求失败: ' + e.message + '</div>';
+            } finally {
+                loadingIndicator.style.display = 'none';
+            }
+        }
+        
+        function copyDescResult() {
+            const descResult = document.getElementById('desc-result').value;
+            if (!descResult.trim()) {
+                alert('没有内容可复制');
+                return;
+            }
+            
+            navigator.clipboard.writeText(descResult).then(function() {
+                alert('已复制到剪贴板！');
+            }).catch(function(err) {
+                const textArea = document.createElement('textarea');
+                textArea.value = descResult;
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    alert('已复制到剪贴板！');
+                } catch (fallbackErr) {
+                    alert('复制失败，请手动复制');
+                }
+                document.body.removeChild(textArea);
+            });
+        }
+        
+        async function saveToDB() {
+            const optionText = document.getElementById('option').value;
+            const tag0 = document.getElementById('tag0').value;
+            const tag1 = document.getElementById('tag1').value;
+            const loadingIndicator = document.getElementById('save-loading-indicator');
+            const messageDiv = document.getElementById('save-message');
+            
+            if (!optionText.trim()) {
+                alert('Option 不能为空');
+                return;
+            }
+            
+            loadingIndicator.style.display = 'inline';
+            messageDiv.innerHTML = '';
+            
+            try {
+                const response = await fetch('/api/save-chart', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        option: optionText,
+                        tag0: tag0,
+                        tag1: tag1,
+                        file_path: visualizationData?.fileName || ''
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    messageDiv.innerHTML = '<div class="success-message">保存成功！记录ID: ' + data.id + '</div>';
+                } else {
+                    messageDiv.innerHTML = '<div class="error-message">保存失败: ' + (data.error || '未知错误') + '</div>';
+                }
+            } catch(e) {
+                messageDiv.innerHTML = '<div class="error-message">请求失败: ' + e.message + '</div>';
+            } finally {
+                loadingIndicator.style.display = 'none';
+            }
+        }
+        
+        window.addEventListener('beforeunload', function() {
+            if (currentChart) {
+                if (currentChart._resizeHandler) {
+                    window.removeEventListener('resize', currentChart._resizeHandler);
+                }
+                currentChart.dispose();
+            }
+        });
+    </script>
+</body>
+</html>

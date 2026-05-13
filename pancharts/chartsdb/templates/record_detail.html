@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>记录详情 - Pancharts数据管理</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f7fa;
+            min-height: 100vh;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+        }
+        .card {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .card-header h2 {
+            font-size: 18px;
+            color: #333;
+        }
+        .tag {
+            display: inline-block;
+            padding: 4px 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+            font-size: 12px;
+            color: #495057;
+            margin-right: 5px;
+        }
+        .tag.tag0 {
+            background: #d1ecf1;
+            color: #0c637f;
+        }
+        .tag.tag1 {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .info-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        .info-item {
+            display: flex;
+            align-items: center;
+        }
+        .info-label {
+            font-weight: 600;
+            color: #666;
+            margin-right: 5px;
+        }
+        .info-value {
+            color: #333;
+            font-family: monospace;
+        }
+        .code-block {
+            background: #f8f9fa;
+            border-radius: 4px;
+            padding: 15px;
+            overflow-x: auto;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            color: #333;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .back-link {
+            margin-bottom: 20px;
+        }
+        .chart-container {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            padding: 20px;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+    </style>
+    
+    {% for js_url in chart_js_dependencies %}
+    <script src="{{ js_url }}"></script>
+    {% endfor %}
+</head>
+<body>
+    <div class="container">
+        <div class="back-link">
+            <a href="/" class="btn btn-primary">← 返回列表</a>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h2>基本信息</h2>
+                <div>
+                    {% if record.tag0 %}<span class="tag tag0">{{ record.tag0 }}</span>{% endif %}
+                    {% if record.tag1 %}<span class="tag tag1">{{ record.tag1 }}</span>{% endif %}
+                </div>
+            </div>
+            
+            <div class="info-grid">
+                <div class="info-item">
+                    <span class="info-label">ID:</span>
+                    <span class="info-value">{{ record.id }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">插入时间:</span>
+                    <span class="info-value">{{ record.insert_time }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">文件路径:</span>
+                    <span class="info-value">{{ record.file_path }}</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="chart-container">
+            <div class="card-header">
+                <h2>图表预览</h2>
+            </div>
+            {{ chart_html | safe }}
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h2>Option 配置</h2>
+            </div>
+            <div class="code-block">{{ option_formatted }}</div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h2>Data Option 配置</h2>
+            </div>
+            <div class="code-block">{{ data_option_formatted }}</div>
+        </div>
+    </div>
+</body>
+</html>

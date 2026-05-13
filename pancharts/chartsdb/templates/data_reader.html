@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数据文件读取 - Pancharts数据管理</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f7fa;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+        }
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+        .btn-danger:hover {
+            background: #c82333;
+        }
+        .btn-sm {
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+        .card {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        .card-header {
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .card-header h2 {
+            font-size: 16px;
+            color: #333;
+        }
+        .form-group {
+            margin-bottom: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .form-group label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #555;
+        }
+        .form-group input, .form-group select, .form-group textarea {
+            padding: 6px 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 13px;
+            width: 100%;
+            max-width: 280px;
+        }
+        .form-group textarea {
+            min-height: 60px;
+            resize: vertical;
+        }
+        .form-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: flex-end;
+        }
+        .form-col {
+            flex: 0 0 auto;
+            min-width: 200px;
+        }
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            margin-bottom: 12px;
+        }
+        .file-input-wrapper input[type=file] {
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+        .file-input-wrapper .btn {
+            pointer-events: none;
+        }
+        .table-container {
+            overflow-x: auto;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            min-width: 600px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 6px 10px;
+            text-align: left;
+            font-size: 12px;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            color: #333;
+            position: sticky;
+            top: 0;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9fa;
+        }
+        .status-message {
+            padding: 8px 12px;
+            border-radius: 4px;
+            margin-bottom: 12px;
+            font-size: 13px;
+        }
+        .status-success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status-error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .file-info {
+            background: #f8f9fa;
+            padding: 8px 12px;
+            border-radius: 4px;
+            margin-bottom: 12px;
+            font-size: 13px;
+            font-family: monospace;
+        }
+        .preview-note {
+            font-size: 11px;
+            color: #666;
+            margin-top: 8px;
+        }
+        .section-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 10px;
+            padding-left: 8px;
+            border-left: 3px solid #667eea;
+        }
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+        }
+        .collapse-section {
+            margin-bottom: 10px;
+        }
+        .collapse-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 12px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            color: #333;
+        }
+        .collapse-header:hover {
+            background: #e9ecef;
+        }
+        .collapse-header .arrow {
+            font-size: 12px;
+            transition: transform 0.2s;
+        }
+        .collapse-header.expanded .arrow {
+            transform: rotate(180deg);
+        }
+        .collapse-content {
+            padding: 10px 12px;
+            border: 1px solid #eee;
+            border-top: none;
+            border-radius: 0 0 4px 4px;
+            display: none;
+        }
+        .collapse-content.expanded {
+            display: block;
+        }
+        .small-text {
+            font-size: 11px;
+            color: #888;
+            margin-top: 2px;
+        }
+        .data-card {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            padding: 15px;
+            margin-bottom: 15px;
+            border-left: 4px solid #667eea;
+        }
+        .data-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #eee;
+        }
+        .data-card-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+        }
+        .data-card-info {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        .data-list-container {
+            margin-top: 20px;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+            font-size: 14px;
+        }
+        .stats-section {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            padding: 15px;
+            margin-bottom: 15px;
+            border-left: 4px solid #28a745;
+        }
+        .stats-section h3 {
+            font-size: 16px;
+            color: #333;
+            margin-bottom: 15px;
+        }
+        .stats-input-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: flex-end;
+            margin-bottom: 15px;
+        }
+        .stats-input-group textarea {
+            flex: 1;
+            min-width: 300px;
+            max-width: 500px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 13px;
+            min-height: 80px;
+        }
+        .stats-output-row {
+            display: flex;
+            gap: 15px;
+            width: 100%;
+        }
+        .stats-output-col {
+            flex: 1;
+            min-width: 300px;
+        }
+        .code-display {
+            background: #f8f9fa;
+            border-radius: 4px;
+            padding: 15px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            max-height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            border: 1px solid #eee;
+        }
+        .raw-response-display {
+            background: #fff3cd;
+            border-radius: 4px;
+            padding: 15px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            max-height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            border: 1px solid #ffeeba;
+        }
+        .code-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 8px;
+            display: block;
+        }
+        .checkbox-select {
+            margin-right: 10px;
+            cursor: pointer;
+        }
+        .checkbox-label {
+            font-size: 13px;
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>数据文件读取</h1>
+        <p>使用 pandas 参数读取数据文件</p>
+        <a href="/" class="btn btn-secondary" style="margin-top: 10px;">← 返回列表</a>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">
+            <h2>读取设置</h2>
+        </div>
+        
+        <div class="section-title">基础设置</div>
+        
+        <div class="file-input-wrapper">
+            <button class="btn btn-primary">选择数据文件（支持多选）</button>
+            <input type="file" id="file-input" accept=".csv,.tsv,.txt,.xls,.xlsx" multiple>
+        </div>
+        <div id="file-info" class="file-info" style="display: none;"></div>
+        
+        <div class="form-row">
+            <div class="form-col">
+                <div class="form-group">
+                    <label>读取函数</label>
+                    <select id="read_func">
+                        <option value="auto">自动检测</option>
+                        <option value="csv">read_csv</option>
+                        <option value="excel">read_excel</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="form-col">
+                <div class="form-group">
+                    <label>分隔符 (sep)</label>
+                    <select id="sep">
+                        <option value=",">逗号</option>
+                        <option value="\t">制表符</option>
+                        <option value=";">分号</option>
+                        <option value="|">竖线</option>
+                        <option value=" ">空格</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="form-col">
+                <div class="form-group">
+                    <label>编码 (encoding)</label>
+                    <select id="encoding">
+                        <option value="utf-8">UTF-8</option>
+                        <option value="gbk">GBK</option>
+                        <option value="gb2312">GB2312</option>
+                        <option value="gb18030">GB18030</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="form-col">
+                <div class="form-group">
+                    <label>表头行 (header)</label>
+                    <select id="header">
+                        <option value="0">第1行</option>
+                        <option value="-1">无表头</option>
+                        <option value="1">第2行</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label>自定义列名 (names)</label>
+            <textarea id="names" placeholder="每行一个列名"></textarea>
+            <div class="small-text">配合 header=-1 使用</div>
+        </div>
+        
+        <div class="collapse-section">
+            <div class="collapse-header" data-target="collapse-advanced">
+                <span>高级选项</span>
+                <span class="arrow">▼</span>
+            </div>
+            <div id="collapse-advanced" class="collapse-content">
+                <div class="form-row">
+                    <div class="form-col">
+                        <div class="form-group">
+                            <label>读取行数 (nrows)</label>
+                            <input type="number" id="nrows" value="" placeholder="全部">
+                        </div>
+                    </div>
+                    
+                    <div class="form-col">
+                        <div class="form-group">
+                            <label>跳过开头 (skiprows)</label>
+                            <input type="number" id="skiprows" value="" placeholder="0">
+                        </div>
+                    </div>
+                    
+                    <div class="form-col">
+                        <div class="form-group">
+                            <label>跳过末尾 (skipfooter)</label>
+                            <input type="number" id="skipfooter" value="" placeholder="0">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>指定列 (usecols)</label>
+                    <input type="text" id="usecols" placeholder="col1,col2">
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-col">
+                        <div class="form-group">
+                            <label>索引列 (index_col)</label>
+                            <input type="text" id="index_col" placeholder="列名或索引">
+                        </div>
+                    </div>
+                    
+                    <div class="form-col">
+                        <div class="form-group">
+                            <label>日期列 (parse_dates)</label>
+                            <input type="text" id="parse_dates" placeholder="date,time">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>缺失值 (na_values)</label>
+                    <input type="text" id="na_values" placeholder="N/A,?">
+                </div>
+                
+                <div class="checkbox-group">
+                    <input type="checkbox" id="skip_blank_lines" checked>
+                    <label for="skip_blank_lines">跳过空行</label>
+                </div>
+            </div>
+        </div>
+        
+        <button id="read-btn" class="btn btn-primary" style="margin-top: 15px;">读取所有文件</button>
+    </div>
+    
+    <div class="stats-section" id="stats-section">
+        <h3>📊 数据统计</h3>
+        
+        <div class="stats-input-group">
+            <textarea id="stats-requirement" placeholder="请输入统计需求，例如：&#10;- 计算各列的均值和标准差&#10;- 按category分组统计数量&#10;- 统计缺失值比例"></textarea>
+            <button id="stats-btn" class="btn btn-primary" disabled>执行统计</button>
+        </div>
+        
+        <div class="stats-output-row">
+            <div class="stats-output-col">
+                <div class="code-label">生成的统计代码：</div>
+                <div id="stats-code" class="code-display">生成的代码将显示在这里...</div>
+            </div>
+            <div class="stats-output-col">
+                <div class="code-label">大模型原始输出：</div>
+                <div id="stats-raw" class="raw-response-display">大模型原始输出将显示在这里...</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="data-list-container" id="data-list-container">
+        <div class="empty-state" id="empty-state">
+            暂无数据，请选择文件并读取
+        </div>
+    </div>
+    
+    <script>
+        const fileInput = document.getElementById('file-input');
+        const fileInfo = document.getElementById('file-info');
+        const readBtn = document.getElementById('read-btn');
+        const dataListContainer = document.getElementById('data-list-container');
+        const emptyState = document.getElementById('empty-state');
+        const statsSection = document.getElementById('stats-section');
+        const statsRequirement = document.getElementById('stats-requirement');
+        const statsBtn = document.getElementById('stats-btn');
+        const statsCode = document.getElementById('stats-code');
+        const statsRaw = document.getElementById('stats-raw');
+        
+        let dataList = [];
+        let fileDataMap = new Map();
+        
+        document.querySelectorAll('.collapse-header').forEach(header => {
+            header.addEventListener('click', function() {
+                this.classList.toggle('expanded');
+                const targetId = this.getAttribute('data-target');
+                document.getElementById(targetId).classList.toggle('expanded');
+            });
+        });
+        
+        fileInput.addEventListener('change', function(e) {
+            const files = Array.from(e.target.files);
+            if (files.length > 0) {
+                const fileNames = files.map(f => f.name).join(', ');
+                fileInfo.textContent = `已选择 ${files.length} 个文件: ${fileNames}`;
+                fileInfo.style.display = 'block';
+                
+                files.forEach(file => {
+                    if (!fileDataMap.has(file.name)) {
+                        const ext = file.name.split('.').pop().toLowerCase();
+                        fileDataMap.set(file.name, {
+                            file: file,
+                            autoFunc: (ext === 'xls' || ext === 'xlsx') ? 'excel' : 'csv'
+                        });
+                    }
+                });
+                
+                if (files.length === 1) {
+                    const ext = files[0].name.split('.').pop().toLowerCase();
+                    if (ext === 'xls' || ext === 'xlsx') {
+                        document.getElementById('read_func').value = 'excel';
+                        document.getElementById('sep').disabled = true;
+                    } else {
+                        document.getElementById('read_func').value = 'csv';
+                        document.getElementById('sep').disabled = false;
+                    }
+                } else {
+                    document.getElementById('read_func').value = 'auto';
+                }
+            }
+        });
+        
+        statsRequirement.addEventListener('input', updateStatsButton);
+        document.addEventListener('change', function(e) {
+            if (e.target.classList.contains('checkbox-select')) {
+                updateStatsButton();
+            }
+        });
+        
+        function updateStatsButton() {
+            const hasSelection = document.querySelectorAll('.checkbox-select:checked').length > 0;
+            const hasRequirement = statsRequirement.value.trim().length > 0;
+            statsBtn.disabled = !(hasSelection && hasRequirement);
+        }
+        
+        readBtn.addEventListener('click', async function() {
+            if (fileDataMap.size === 0) {
+                alert('请先选择文件');
+                return;
+            }
+            
+            readBtn.disabled = true;
+            readBtn.textContent = '读取中...';
+            
+            for (const [fileName, fileData] of fileDataMap) {
+                try {
+                    await readSingleFile(fileName, fileData.file);
+                } catch (error) {
+                    console.error(`读取文件 ${fileName} 失败:`, error);
+                }
+            }
+            
+            readBtn.disabled = false;
+            readBtn.textContent = '读取所有文件';
+        });
+        
+        async function readSingleFile(fileName, file) {
+            return new Promise((resolve, reject) => {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('read_func', document.getElementById('read_func').value);
+                formData.append('sep', document.getElementById('sep').value);
+                formData.append('encoding', document.getElementById('encoding').value);
+                formData.append('header', document.getElementById('header').value);
+                formData.append('names', document.getElementById('names').value);
+                
+                const nrows = document.getElementById('nrows').value;
+                if (nrows) formData.append('nrows', nrows);
+                
+                const skiprows = document.getElementById('skiprows').value;
+                if (skiprows) formData.append('skiprows', skiprows);
+                
+                const skipfooter = document.getElementById('skipfooter').value;
+                if (skipfooter) formData.append('skipfooter', skipfooter);
+                
+                const usecols = document.getElementById('usecols').value;
+                if (usecols) formData.append('usecols', usecols);
+                
+                const index_col = document.getElementById('index_col').value;
+                if (index_col) formData.append('index_col', index_col);
+                
+                const parse_dates = document.getElementById('parse_dates').value;
+                if (parse_dates) formData.append('parse_dates', parse_dates);
+                
+                const na_values = document.getElementById('na_values').value;
+                if (na_values) formData.append('na_values', na_values);
+                
+                formData.append('skip_blank_lines', document.getElementById('skip_blank_lines').checked);
+                
+                fetch('/api/read-data', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success) {
+                        addDataCard(fileName, result.data, result.row_count, result.col_count);
+                        resolve(result);
+                    } else {
+                        alert(`读取文件 ${fileName} 失败: ${result.error}`);
+                        reject(result.error);
+                    }
+                })
+                .catch(error => {
+                    alert(`读取文件 ${fileName} 失败: ${error.message}`);
+                    reject(error);
+                });
+            });
+        }
+        
+        function addDataCard(fileName, data, rowCount, colCount, isStatsResult = false, dataType = 'dataframe') {
+            emptyState.style.display = 'none';
+            statsSection.style.display = 'block';
+            
+            const existingCard = document.querySelector(`[data-filename="${fileName}"]`);
+            
+            if (existingCard) {
+                const cardId = existingCard.id;
+                existingCard.querySelector('.data-card-info').textContent = `${rowCount} 行 × ${colCount} 列`;
+                const showAll = existingCard.getAttribute('data-show-all') === 'true';
+                existingCard.querySelector('.preview-note').textContent = showAll ? `显示全部 ${data.length} 行数据` : `显示前 ${Math.min(10, data.length)} 行数据 | 共 ${rowCount} 行 ${colCount} 列`;
+                existingCard.querySelector('.toggle-display-btn').textContent = showAll ? '显示部分' : '显示全部';
+                const table = existingCard.querySelector('table');
+                renderTable(data, table.id, showAll);
+                
+                const listItem = dataList.find(item => item.id === cardId);
+                if (listItem) {
+                    listItem.data = data;
+                    listItem.rowCount = rowCount;
+                    listItem.colCount = colCount;
+                }
+            } else {
+                const cardId = 'data-card-' + Date.now();
+                const card = document.createElement('div');
+                card.className = 'data-card';
+                card.id = cardId;
+                card.setAttribute('data-filename', fileName);
+                card.setAttribute('data-show-all', isStatsResult ? 'true' : 'false');
+                card.setAttribute('data-card-id', cardId);
+                
+                const previewNote = isStatsResult ? `显示全部 ${data.length} 行数据` : `显示前 ${Math.min(10, data.length)} 行数据 | 共 ${rowCount} 行 ${colCount} 列`;
+                const toggleBtnText = isStatsResult ? '显示部分' : '显示全部';
+                
+                card.innerHTML = `
+                    <div class="data-card-header">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <input type="checkbox" class="checkbox-select" data-card-id="${cardId}">
+                            <div>
+                                <div class="data-card-title">${fileName}</div>
+                                <div class="data-card-info">${rowCount} 行 × ${colCount} 列</div>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 5px; align-items: center;">
+                            <button class="btn btn-secondary btn-sm toggle-display-btn" onclick="toggleDisplay('${cardId}')">${toggleBtnText}</button>
+                            <button class="btn btn-primary btn-sm" onclick="navigateToVisualization('${cardId}')">可视化</button>
+                            <button class="btn btn-danger btn-sm" onclick="removeDataCard('${cardId}', '${fileName}')">删除数据</button>
+                            <span style="margin-left: 10px; padding: 4px 8px; background: #e9ecef; border-radius: 4px; font-size: 12px; color: #495057;">
+                                类型: ${dataType === 'series' ? 'Series' : 'DataFrame'}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="status-message status-success">读取成功</div>
+                    <div class="table-container">
+                        <table id="${cardId}-table"></table>
+                    </div>
+                    <div class="preview-note">${previewNote}</div>
+                `;
+                
+                if (isStatsResult) {
+                    dataListContainer.prepend(card);
+                } else {
+                    dataListContainer.appendChild(card);
+                }
+                
+                renderTable(data, `${cardId}-table`, isStatsResult);
+                
+                dataList.push({
+                    id: cardId,
+                    fileName: fileName,
+                    data: data,
+                    rowCount: rowCount,
+                    colCount: colCount,
+                    dataType: dataType,
+                    file: fileDataMap.get(fileName)?.file || null
+                });
+            }
+            
+            fileDataMap.delete(fileName);
+            updateFileInfo();
+        }
+        
+        function toggleDisplay(cardId) {
+            const card = document.getElementById(cardId);
+            if (!card) return;
+            
+            const currentShowAll = card.getAttribute('data-show-all') === 'true';
+            const newShowAll = !currentShowAll;
+            card.setAttribute('data-show-all', newShowAll ? 'true' : 'false');
+            
+            const listItem = dataList.find(item => item.id === cardId);
+            if (!listItem) return;
+            
+            const previewNote = newShowAll ? `显示全部 ${listItem.data.length} 行数据` : `显示前 ${Math.min(10, listItem.data.length)} 行数据 | 共 ${listItem.rowCount} 行 ${listItem.colCount} 列`;
+            card.querySelector('.preview-note').textContent = previewNote;
+            card.querySelector('.toggle-display-btn').textContent = newShowAll ? '显示部分' : '显示全部';
+            
+            renderTable(listItem.data, `${cardId}-table`, newShowAll);
+        }
+        
+        function navigateToVisualization(cardId) {
+            const listItem = dataList.find(item => item.id === cardId);
+            if (!listItem) {
+                alert('未找到数据');
+                return;
+            }
+            
+            const dataToSend = {
+                fileName: listItem.fileName,
+                data: listItem.data,
+                rowCount: listItem.rowCount,
+                colCount: listItem.colCount,
+                dataType: listItem.dataType || 'dataframe'
+            };
+            
+            sessionStorage.setItem('visualizationData', JSON.stringify(dataToSend));
+            window.location.href = '/visualization';
+        }
+        
+        function renderTable(data, tableId, showAll = false) {
+            const table = document.getElementById(tableId);
+            if (!table) return;
+            
+            table.innerHTML = '';
+            
+            if (data.length === 0) {
+                table.innerHTML = '<tr><td colspan="100">没有数据</td></tr>';
+                return;
+            }
+            
+            const headers = Object.keys(data[0]);
+            
+            const thead = document.createElement('thead');
+            const headerRow = document.createElement('tr');
+            headers.forEach(header => {
+                const th = document.createElement('th');
+                th.textContent = header;
+                headerRow.appendChild(th);
+            });
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+            
+            const tbody = document.createElement('tbody');
+            const displayData = showAll ? data : data.slice(0, 10);
+            displayData.forEach(row => {
+                const tr = document.createElement('tr');
+                headers.forEach(header => {
+                    const td = document.createElement('td');
+                    td.textContent = row[header] !== undefined ? row[header] : '';
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            });
+            table.appendChild(tbody);
+        }
+        
+        function removeDataCard(cardId, fileName) {
+            if (!confirm(`确定要删除数据 "${fileName}" 吗？`)) {
+                return;
+            }
+            
+            const card = document.getElementById(cardId);
+            if (card) {
+                card.remove();
+            }
+            
+            fileDataMap.delete(fileName);
+            
+            dataList = dataList.filter(item => item.id !== cardId);
+            
+            if (dataList.length === 0) {
+                emptyState.style.display = 'block';
+                statsSection.style.display = 'none';
+            }
+            
+            updateFileInfo();
+            updateStatsButton();
+        }
+        
+        function updateFileInfo() {
+            if (fileDataMap.size > 0) {
+                const fileNames = Array.from(fileDataMap.keys()).join(', ');
+                fileInfo.textContent = `已选择 ${fileDataMap.size} 个文件: ${fileNames}`;
+                fileInfo.style.display = 'block';
+            } else {
+                fileInfo.style.display = 'none';
+                fileInput.value = '';
+            }
+        }
+        
+        statsBtn.addEventListener('click', async function() {
+            const selectedCards = document.querySelectorAll('.checkbox-select:checked');
+            const requirement = statsRequirement.value.trim();
+            
+            if (selectedCards.length === 0 || !requirement) {
+                return;
+            }
+            
+            statsBtn.disabled = true;
+            statsBtn.textContent = '统计中...';
+            statsCode.textContent = '正在生成统计代码...';
+            statsRaw.textContent = '正在获取大模型输出...';
+            
+            try {
+                const cardId = selectedCards[0].getAttribute('data-card-id');
+                const selectedData = dataList.find(item => item.id === cardId);
+                
+                if (!selectedData) {
+                    alert('未找到选中的数据');
+                    return;
+                }
+                
+                let response;
+                
+                if (selectedData.file) {
+                    const formData = new FormData();
+                    formData.append('file', selectedData.file);
+                    formData.append('requirement', requirement);
+                    formData.append('read_func', document.getElementById('read_func').value);
+                    formData.append('sep', document.getElementById('sep').value);
+                    formData.append('encoding', document.getElementById('encoding').value);
+                    formData.append('header', document.getElementById('header').value);
+                    formData.append('names', document.getElementById('names').value);
+                    
+                    response = await fetch('/api/stats-data-full', {
+                        method: 'POST',
+                        body: formData
+                    });
+                } else {
+                    response = await fetch('/api/stats-data', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            data: selectedData.data,
+                            requirement: requirement
+                        })
+                    });
+                }
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    statsCode.textContent = result.code;
+                    statsRaw.textContent = result.raw_response || '无原始输出';
+                    
+                    if (result.result) {
+                        const resultFileName = `${selectedData.fileName}_stats_result_${Date.now()}`;
+                        
+                        let formattedData = result.result;
+                        let actualRowCount = result.row_count;
+                        let actualColCount = result.col_count;
+                        
+                        if (result.data_type === 'series') {
+                            formattedData = result.result.index.map((idx, i) => ({
+                                [result.result.name || 'index']: idx,
+                                value: result.result.values[i]
+                            }));
+                            actualRowCount = result.result.index.length;
+                            actualColCount = 2;
+                        }
+                        
+                        addDataCard(resultFileName, formattedData, actualRowCount, actualColCount, true, result.data_type);
+                    }
+                } else {
+                    statsCode.textContent = `错误: ${result.error}`;
+                    statsRaw.textContent = result.raw_response || '无原始输出';
+                }
+            } catch (error) {
+                statsCode.textContent = `请求失败: ${error.message}`;
+                statsRaw.textContent = '获取失败';
+            } finally {
+                statsBtn.disabled = false;
+                statsBtn.textContent = '执行统计';
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>编辑记录 - Pancharts数据管理</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f7fa;
+            min-height: 100vh;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+        }
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+        .card {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .card-header h2 {
+            font-size: 18px;
+            color: #333;
+        }
+        .info-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            align-items: center;
+        }
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+            min-width: 80px;
+        }
+        .info-item {
+            display: flex;
+            align-items: center;
+        }
+        .info-label {
+            font-weight: 600;
+            color: #666;
+            margin-right: 5px;
+        }
+        .info-value {
+            color: #333;
+            font-family: monospace;
+        }
+        .tag-item {
+            display: flex;
+            align-items: center;
+        }
+        .tag-label {
+            font-weight: 600;
+            color: #666;
+            margin-right: 5px;
+        }
+        .code-block {
+            background: #f8f9fa;
+            border-radius: 4px;
+            padding: 15px;
+            overflow-x: auto;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            color: #333;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            min-height: 200px;
+        }
+        .form-control {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            min-height: 200px;
+            resize: vertical;
+        }
+        .tag-input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .back-link {
+            margin-bottom: 20px;
+        }
+        .chart-container {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            padding: 20px;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #333;
+        }
+        .preview-note {
+            background: #fff3cd;
+            border: 1px solid #ffeeba;
+            border-radius: 4px;
+            padding: 10px;
+            margin-bottom: 15px;
+            font-size: 14px;
+            color: #856404;
+        }
+        .options-container {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+        }
+        .option-panel {
+            flex: 1;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            padding: 20px;
+        }
+        .option-panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .option-panel h2 {
+            font-size: 18px;
+            color: #333;
+        }
+        .transfer-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 10px;
+            min-width: 80px;
+        }
+        .ai-prompt-section {
+            margin-top: 15px;
+        }
+        .ai-prompt-section textarea {
+            width: 100%;
+            min-height: 80px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            resize: vertical;
+            margin-bottom: 10px;
+        }
+        .ai-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .loading-indicator {
+            display: none;
+            color: #667eea;
+            font-size: 14px;
+        }
+        .error-message {
+            color: #dc3545;
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 4px;
+            padding: 10px;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+        .success-message {
+            color: #155724;
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-radius: 4px;
+            padding: 10px;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+    </style>
+    
+    {% for js_url in chart_js_dependencies %}
+    <script src="{{ js_url }}"></script>
+    {% endfor %}
+</head>
+<body>
+    <div class="container">
+        <div class="back-link">
+            <a href="/" class="btn btn-secondary">← 返回列表</a>
+            <a href="/record/{{ record.id }}" class="btn btn-secondary">查看详情</a>
+        </div>
+        
+        <form action="/update/{{ record.id }}" method="post">
+            <div class="card">
+                <div class="info-grid">
+                    <span class="card-title">基本信息</span>
+                    <div class="info-item">
+                        <span class="info-label">ID:</span>
+                        <span class="info-value">{{ record.id }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">插入时间:</span>
+                        <span class="info-value">{{ record.insert_time }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">文件路径:</span>
+                        <span class="info-value">{{ record.file_path }}</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <h2>图表预览</h2>
+                </div>
+                <div class="preview-note">
+                    <strong>提示:</strong> 点击"查看预览"按钮可以预览修改后的图表效果
+                </div>
+                <div id="chart-preview-container">{{ chart_html | safe }}</div>
+                <div style="margin-top: 15px; display: flex; gap: 10px;">
+                    <button type="button" id="preview-btn" class="btn btn-primary">查看预览</button>
+                    <button type="button" id="reset-btn" class="btn btn-secondary">还原</button>
+                    <button type="submit" class="btn btn-primary">提交修改</button>
+                    <a href="/record/{{ record.id }}" class="btn btn-secondary">取消</a>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="info-grid">
+                    <span class="card-title">标签设置</span>
+                    <div class="tag-item">
+                        <span class="tag-label">标签0:</span>
+                        <input type="text" name="tag0" class="tag-input" value="{{ record.tag0 or '' }}" placeholder="输入标签0">
+                    </div>
+                    <div class="tag-item">
+                        <span class="tag-label">标签1:</span>
+                        <input type="text" name="tag1" class="tag-input" value="{{ record.tag1 or '' }}" placeholder="输入标签1">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <h2>Option 配置</h2>
+                </div>
+                <div class="options-container">
+                    <div class="option-panel" style="display: flex; flex-direction: column; height: 100%; min-height: 550px;">
+                        <div class="option-panel-header">
+                            <h2>当前 Option</h2>
+                        </div>
+                        <div class="form-group" style="flex: 1;">
+                            <textarea id="option" name="option" class="form-control" style="height: 100%; min-height: 500px;" placeholder="输入ECharts配置">{{ option_formatted }}</textarea>
+                        </div>
+                    </div>
+                    
+                    <div class="transfer-section">
+                        <button type="button" id="transfer-btn" class="btn btn-primary" title="将右侧内容替换到左侧">← 替换</button>
+                    </div>
+                    
+                    <div class="option-panel" style="display: flex; flex-direction: column; height: 100%; min-height: 550px;">
+                        <div class="option-panel-header">
+                            <h2>AI 修改</h2>
+                        </div>
+                        <div class="ai-controls" style="margin-bottom: 10px;">
+                            <button type="button" id="ai-modify-btn" class="btn btn-primary">AI 修改</button>
+                            <button type="button" id="ai-preview-btn" class="btn btn-secondary">预览结果</button>
+                            <span id="loading-indicator" class="loading-indicator">修改中...</span>
+                        </div>
+                        <div class="ai-prompt-section" style="margin-bottom: 10px;">
+                            <textarea id="ai-prompt" style="min-height: 120px;" placeholder="输入修改指令，例如：&#10;- 调整标题为'销售报表'&#10;- 将颜色改为蓝色系&#10;- 添加数据缩放功能"></textarea>
+                        </div>
+                        <div id="ai-message" style="margin-bottom: 10px;"></div>
+                        <div class="form-group" style="flex: 1;">
+                            <textarea id="ai-option" class="form-control" style="height: 100%; min-height: 300px;" placeholder="AI 修改后的 Option 将显示在这里" readonly></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <h2>Data Option 配置</h2>
+                </div>
+                <div class="options-container" style="min-height: 800px;">
+                    <div class="option-panel" style="display: flex; flex-direction: column; height: 100%; min-height: 800px;">
+                        <div class="option-panel-header">
+                            <h2>数据配置</h2>
+                        </div>
+                        <div class="form-group" style="flex: 1;">
+                            <textarea id="data_option" name="data_option" class="form-control" style="height: 100%; min-height: 750px;" placeholder="输入数据配置">{{ data_option_formatted }}</textarea>
+                        </div>
+                    </div>
+                    
+                    <div class="option-panel" style="display: flex; flex-direction: column; height: 100%; min-height: 800px;">
+                        <div class="option-panel-header">
+                            <h2>数据分析</h2>
+                        </div>
+                        <div class="ai-controls" style="margin-bottom: 10px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                            <button type="button" id="desc-chat-btn" class="btn btn-primary">生成分析</button>
+                            <button type="button" id="desc-copy-btn" class="btn btn-secondary">一键复制</button>
+                            <div style="display: flex; align-items: center; gap: 5px;">
+                                <label style="margin: 0;">输出字数:</label>
+                                <input type="number" id="desc-max-words" class="tag-input" style="width: 100px; padding: 5px;" value="200" min="50" max="2000">
+                            </div>
+                            <span id="desc-loading-indicator" class="loading-indicator">分析中...</span>
+                        </div>
+                        <div class="ai-prompt-section" style="margin-bottom: 10px;">
+                            <textarea id="desc-prompt" style="min-height: 100px;" placeholder="输入分析要求，例如：&#10;- 分析数据的趋势和特征&#10;- 找出数据中的关键指标&#10;- 分析数据的商业意义"></textarea>
+                        </div>
+                        <div id="desc-message" style="margin-bottom: 10px;"></div>
+                        <div class="form-group" style="flex: 1;">
+                            <textarea id="desc-result" class="form-control" style="height: 100%; min-height: 600px;" placeholder="分析结果将显示在这里"></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+        </form>
+    </div>
+    
+    <script>
+        const originalOption = {{ option_formatted | safe }};
+        var currentChart = null;
+        
+        function renderChartWithDesc(optionData) {
+            const container = document.getElementById('chart-preview-container');
+            
+            if (currentChart) {
+                if (currentChart._resizeHandler) {
+                    window.removeEventListener('resize', currentChart._resizeHandler);
+                }
+                currentChart.dispose();
+                currentChart = null;
+            }
+            
+            const desc = optionData.desc || '';
+            
+            let containerHtml = '<div style="display: flex; gap: 20px; align-items: flex-start;">';
+            containerHtml += '<div id="chart-preview-inner" style="width: 100%; height: 400px; flex: 1;"></div>';
+            
+            if (desc) {
+                containerHtml += '<div style="width: 300px; padding: 15px; background-color: #f9f9f9; border-radius: 8px; border-left: 4px solid #1890ff; font-size: 14px; line-height: 1.6; color: #333;">';
+                containerHtml += '<div style="font-weight: bold; font-size: 16px; margin-bottom: 10px; color: #1890ff;">图表说明</div>';
+                containerHtml += desc;
+                containerHtml += '</div>';
+            }
+            
+            containerHtml += '</div>';
+            container.innerHTML = containerHtml;
+            
+            const chartOption = JSON.parse(JSON.stringify(optionData));
+            delete chartOption.desc;
+            
+            const chartDom = document.getElementById('chart-preview-inner');
+            currentChart = echarts.init(chartDom);
+            currentChart.setOption(chartOption);
+            
+            const resizeHandler = function() {
+                currentChart.resize();
+            };
+            window.addEventListener('resize', resizeHandler);
+            currentChart._resizeHandler = resizeHandler;
+        }
+        
+        document.getElementById('preview-btn').addEventListener('click', function() {
+            const optionText = document.getElementById('option').value;
+            if (!optionText.trim()) {
+                alert('Option 不能为空');
+                return;
+            }
+            
+            try {
+                const option = JSON.parse(optionText);
+                renderChartWithDesc(option);
+                alert('预览成功！');
+            } catch(e) {
+                alert('预览失败: ' + e.message);
+                console.error('Preview error:', e);
+            }
+        });
+        
+        document.getElementById('reset-btn').addEventListener('click', function() {
+            if (confirm('确定要还原为原始版本吗？')) {
+                document.getElementById('option').value = JSON.stringify(originalOption, null, 2);
+                document.getElementById('ai-option').value = '';
+                document.getElementById('ai-prompt').value = '';
+                document.getElementById('ai-message').innerHTML = '';
+                
+                try {
+                    renderChartWithDesc(originalOption);
+                } catch(e) {
+                    console.error('还原预览失败:', e);
+                }
+                
+                alert('已还原为原始版本');
+            }
+        });
+        
+        document.getElementById('ai-modify-btn').addEventListener('click', async function() {
+            const optionText = document.getElementById('option').value;
+            const prompt = document.getElementById('ai-prompt').value;
+            const loadingIndicator = document.getElementById('loading-indicator');
+            const messageDiv = document.getElementById('ai-message');
+            
+            if (!optionText.trim()) {
+                alert('Option 不能为空');
+                return;
+            }
+            
+            if (!prompt.trim()) {
+                alert('请输入修改指令');
+                return;
+            }
+            
+            loadingIndicator.style.display = 'inline';
+            messageDiv.innerHTML = '';
+            
+            try {
+                const response = await fetch('/api/patch_option', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        option: optionText,
+                        prompt: prompt
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('ai-option').value = JSON.stringify(JSON.parse(data.patched_option), null, 2);
+                    messageDiv.innerHTML = '<div class="success-message">修改成功！可以预览效果或替换到左侧。</div>';
+                } else {
+                    messageDiv.innerHTML = '<div class="error-message">修改失败: ' + (data.error || '未知错误') + '</div>';
+                }
+            } catch(e) {
+                messageDiv.innerHTML = '<div class="error-message">请求失败: ' + e.message + '</div>';
+                console.error('AI modify error:', e);
+            } finally {
+                loadingIndicator.style.display = 'none';
+            }
+        });
+        
+        document.getElementById('ai-preview-btn').addEventListener('click', function() {
+            const aiOptionText = document.getElementById('ai-option').value;
+            if (!aiOptionText.trim()) {
+                alert('AI 修改结果为空，请先点击"AI 修改"按钮');
+                return;
+            }
+            
+            try {
+                const option = JSON.parse(aiOptionText);
+                renderChartWithDesc(option);
+                alert('预览成功！');
+            } catch(e) {
+                alert('预览失败: ' + e.message);
+                console.error('Preview error:', e);
+            }
+        });
+        
+        document.getElementById('transfer-btn').addEventListener('click', function() {
+            const aiOptionText = document.getElementById('ai-option').value;
+            if (!aiOptionText.trim()) {
+                alert('AI 修改结果为空，无需替换');
+                return;
+            }
+            
+            if (confirm('确定要将右侧 AI 修改结果替换到左侧吗？')) {
+                document.getElementById('option').value = aiOptionText;
+                alert('已替换！可以点击"查看预览"按钮预览效果。');
+            }
+        });
+        
+        document.getElementById('desc-chat-btn').addEventListener('click', async function() {
+            const dataConfigText = document.getElementById('data_option').value;
+            const descPrompt = document.getElementById('desc-prompt').value;
+            const descMaxWords = document.getElementById('desc-max-words').value;
+            const loadingIndicator = document.getElementById('desc-loading-indicator');
+            const messageDiv = document.getElementById('desc-message');
+            
+            if (!dataConfigText.trim()) {
+                alert('数据配置不能为空');
+                return;
+            }
+            
+            if (!descPrompt.trim()) {
+                alert('请输入分析要求');
+                return;
+            }
+            
+            loadingIndicator.style.display = 'inline';
+            messageDiv.innerHTML = '';
+            
+            try {
+                const response = await fetch('/api/desc_chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        user_requirement: descPrompt,
+                        data_config: dataConfigText,
+                        max_words: parseInt(descMaxWords)
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('desc-result').value = data.result;
+                    messageDiv.innerHTML = '<div class="success-message">分析成功！可以手动修改结果或复制。</div>';
+                } else {
+                    messageDiv.innerHTML = '<div class="error-message">分析失败: ' + (data.error || '未知错误') + '</div>';
+                }
+            } catch(e) {
+                messageDiv.innerHTML = '<div class="error-message">请求失败: ' + e.message + '</div>';
+                console.error('Desc chat error:', e);
+            } finally {
+                loadingIndicator.style.display = 'none';
+            }
+        });
+        
+        document.getElementById('desc-copy-btn').addEventListener('click', function() {
+            const descResult = document.getElementById('desc-result').value;
+            if (!descResult.trim()) {
+                alert('没有内容可复制');
+                return;
+            }
+            
+            navigator.clipboard.writeText(descResult).then(function() {
+                alert('已复制到剪贴板！');
+            }).catch(function(err) {
+                // 如果 API 不可用，使用备用方法
+                const textArea = document.createElement('textarea');
+                textArea.value = descResult;
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    alert('已复制到剪贴板！');
+                } catch (fallbackErr) {
+                    alert('复制失败，请手动复制');
+                }
+                document.body.removeChild(textArea);
+            });
+        });
+        
+        window.addEventListener('beforeunload', function() {
+            if (currentChart) {
+                if (currentChart._resizeHandler) {
+                    window.removeEventListener('resize', currentChart._resizeHandler);
+                }
+                currentChart.dispose();
+            }
+        });
+    </script>
+</body>
+</html>
