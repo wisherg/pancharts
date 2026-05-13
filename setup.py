@@ -23,7 +23,11 @@ setup(
     install_requires=[
         "pandas>=1.0.0",
         "jinja2>=2.11.0",
-        "openai>=1.0.0"
+        "openai>=1.0.0",
+        "fastapi>=0.100.0",
+        "uvicorn>=0.20.0",
+        "pydantic>=2.0.0",
+        "numpy>=1.19.0"
     ],
     classifiers=[
         "Programming Language :: Python :: 3",
