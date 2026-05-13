@@ -1,0 +1,99 @@
+<div class="pancharts-container" style="display: flex; gap: 20px; align-items: flex-start;">
+    <div id="chart-{{ random_id }}" style="width: {{ width }}; height: {{ height }}; flex: 1;"></div>
+    {% if desc %}
+    <div class="pancharts-desc" style="width: 300px; padding: 15px; background-color: #f9f9f9; border-radius: 8px; border-left: 4px solid #1890ff; font-size: 14px; line-height: 1.6; color: #333;">
+        <div class="pancharts-desc-title" style="font-weight: bold; font-size: 16px; margin-bottom: 10px; color: #1890ff;">图表说明</div>
+        {{ desc }}
+    </div>
+    {% endif %}
+</div>
+
+<script type="application/json" id="chart-config-{{ random_id }}">
+{
+    "random_id": {{ random_id }},
+    "theme": "{{ theme }}",
+    "renderer": "{{ renderer }}",
+    "option": {{ option|safe }},
+    "is_amap_chart": {% if is_amap_chart %}true{% else %}false{% endif %}
+}
+</script>
+
+<script>
+    (function() {
+        var configId = 'chart-config-{{ random_id }}';
+        var chartId = 'chart-{{ random_id }}';
+        
+        var initChart = function() {
+            var configEl = document.getElementById(configId);
+            var chartDom = document.getElementById(chartId);
+            
+            if (!configEl || !chartDom) {
+                console.warn('Chart config or container not found:', chartId);
+                return;
+            }
+            
+            // 避免重复初始化
+            if (chartDom._pancharts_initialized) return;
+            chartDom._pancharts_initialized = true;
+            
+            // 检查 echarts 是否可用
+            if (typeof echarts === 'undefined') {
+                console.warn('ECharts not found, cannot initialize chart:', chartId);
+                return;
+            }
+            
+            try {
+                var config = JSON.parse(configEl.textContent);
+                var chart = echarts.init(chartDom, config.theme, { renderer: config.renderer });
+                chart.setOption(config.option);
+                
+                if (config.is_amap_chart) {
+                    // 高德地图扩展组件初始化
+                    var amapComponent = chart.getModel().getComponent('amap');
+                    if (amapComponent) {
+                        var amap = amapComponent.getAMap();
+                        amap.addControl(new AMap.Scale());
+                        amap.addControl(new AMap.ToolBar());
+                        amapComponent.setEChartsLayerInteractive(true);
+                    }
+                }
+                
+                // 响应式处理
+                var resizeHandler = function() {
+                    chart.resize();
+                };
+                window.addEventListener('resize', resizeHandler);
+                
+                // 保存引用
+                chartDom._pancharts_chart = chart;
+                chartDom._pancharts_resizeHandler = resizeHandler;
+                
+            } catch (e) {
+                console.error('Failed to initialize chart:', chartId, e);
+            }
+        };
+        
+        // 支持多种初始化时机
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initChart);
+        } else {
+            setTimeout(initChart, 10);
+        }
+        
+        // 暴露全局初始化函数
+        window['initPancharts_{{ random_id }}'] = initChart;
+        
+        // 暴露销毁函数
+        window['destroyPancharts_{{ random_id }}'] = function() {
+            var chartDom = document.getElementById(chartId);
+            if (chartDom && chartDom._pancharts_chart) {
+                if (chartDom._pancharts_resizeHandler) {
+                    window.removeEventListener('resize', chartDom._pancharts_resizeHandler);
+                }
+                chartDom._pancharts_chart.dispose();
+                chartDom._pancharts_initialized = false;
+                chartDom._pancharts_chart = null;
+            }
+        };
+    })();
+</script>
