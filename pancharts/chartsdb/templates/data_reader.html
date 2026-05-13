@@ -65,6 +65,13 @@
         .btn-danger:hover {
             background: #c82333;
         }
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        .btn-success:hover {
+            background: #218838;
+        }
         .btn-sm {
             padding: 5px 10px;
             font-size: 12px;
@@ -126,6 +133,11 @@
             overflow: hidden;
             display: inline-block;
             margin-bottom: 12px;
+            height: 34px;
+        }
+        .file-input-wrapper .btn {
+            height: 100%;
+            padding: 6px 16px;
         }
         .file-input-wrapper input[type=file] {
             position: absolute;
@@ -377,9 +389,14 @@
         
         <div class="section-title">基础设置</div>
         
-        <div class="file-input-wrapper">
-            <button class="btn btn-primary">选择数据文件（支持多选）</button>
-            <input type="file" id="file-input" accept=".csv,.tsv,.txt,.xls,.xlsx" multiple>
+        <div style="display: flex; gap: 15px; align-items: flex-end;">
+            <div class="file-input-wrapper">
+                <button class="btn btn-primary">选择数据文件</button>
+                <input type="file" id="file-input" accept=".csv,.tsv,.txt,.xls,.xlsx" multiple>
+            </div>
+            <select id="history-select" onchange="loadHistoryConfig()" style="min-width: 250px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
+                <option value="">历史数据记录</option>
+            </select>
         </div>
         <div id="file-info" class="file-info" style="display: none;"></div>
         
@@ -436,6 +453,12 @@
             <label>自定义列名 (names)</label>
             <textarea id="names" placeholder="每行一个列名"></textarea>
             <div class="small-text">配合 header=-1 使用</div>
+        </div>
+        
+        <div class="form-group">
+            <label>数据描述 (desc)</label>
+            <textarea id="data_desc" placeholder="请输入数据描述（可选），例如：销售数据，包含2024年各月度销售额"></textarea>
+            <div class="small-text">用于记录数据的业务含义，方便后续使用</div>
         </div>
         
         <div class="collapse-section">
@@ -500,7 +523,7 @@
             </div>
         </div>
         
-        <button id="read-btn" class="btn btn-primary" style="margin-top: 15px;">读取所有文件</button>
+        <button id="read-btn" class="btn btn-primary" style="margin-top: 15px;">读取</button>
     </div>
     
     <div class="stats-section" id="stats-section">
@@ -599,7 +622,7 @@
         
         readBtn.addEventListener('click', async function() {
             if (fileDataMap.size === 0) {
-                alert('请先选择文件');
+                alert('请先选择文件或历史数据');
                 return;
             }
             
@@ -608,57 +631,35 @@
             
             for (const [fileName, fileData] of fileDataMap) {
                 try {
-                    await readSingleFile(fileName, fileData.file);
+                    if (fileData.isHistory) {
+                        await readHistoryFile(fileName, fileData);
+                    } else {
+                        await readSingleFile(fileName, fileData.file);
+                    }
                 } catch (error) {
                     console.error(`读取文件 ${fileName} 失败:`, error);
                 }
             }
             
             readBtn.disabled = false;
-            readBtn.textContent = '读取所有文件';
+            readBtn.textContent = '读取';
         });
         
-        async function readSingleFile(fileName, file) {
+        async function readHistoryFile(fileName, fileData) {
             return new Promise((resolve, reject) => {
-                const formData = new FormData();
-                formData.append('file', file);
-                formData.append('read_func', document.getElementById('read_func').value);
-                formData.append('sep', document.getElementById('sep').value);
-                formData.append('encoding', document.getElementById('encoding').value);
-                formData.append('header', document.getElementById('header').value);
-                formData.append('names', document.getElementById('names').value);
-                
-                const nrows = document.getElementById('nrows').value;
-                if (nrows) formData.append('nrows', nrows);
-                
-                const skiprows = document.getElementById('skiprows').value;
-                if (skiprows) formData.append('skiprows', skiprows);
-                
-                const skipfooter = document.getElementById('skipfooter').value;
-                if (skipfooter) formData.append('skipfooter', skipfooter);
-                
-                const usecols = document.getElementById('usecols').value;
-                if (usecols) formData.append('usecols', usecols);
-                
-                const index_col = document.getElementById('index_col').value;
-                if (index_col) formData.append('index_col', index_col);
-                
-                const parse_dates = document.getElementById('parse_dates').value;
-                if (parse_dates) formData.append('parse_dates', parse_dates);
-                
-                const na_values = document.getElementById('na_values').value;
-                if (na_values) formData.append('na_values', na_values);
-                
-                formData.append('skip_blank_lines', document.getElementById('skip_blank_lines').checked);
-                
-                fetch('/api/read-data', {
+                fetch('/api/read-data-by-path', {
                     method: 'POST',
-                    body: formData
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        file_path: fileData.filePath,
+                        file_suffix: fileData.fileSuffix,
+                        read_config: fileData.readConfig
+                    })
                 })
                 .then(response => response.json())
                 .then(result => {
                     if (result.success) {
-                        addDataCard(fileName, result.data, result.row_count, result.col_count);
+                        addDataCard(result.file_name, result.data, result.row_count, result.col_count, false, 'dataframe', fileData.desc || '(导入数据)');
                         resolve(result);
                     } else {
                         alert(`读取文件 ${fileName} 失败: ${result.error}`);
@@ -672,7 +673,69 @@
             });
         }
         
-        function addDataCard(fileName, data, rowCount, colCount, isStatsResult = false, dataType = 'dataframe') {
+        async function readSingleFile(fileName, file) {
+            return new Promise((resolve, reject) => {
+                const readConfig = {
+                    read_func: document.getElementById('read_func').value,
+                    sep: document.getElementById('sep').value,
+                    encoding: document.getElementById('encoding').value,
+                    header: document.getElementById('header').value,
+                    names: document.getElementById('names').value,
+                    nrows: document.getElementById('nrows').value || undefined,
+                    skiprows: document.getElementById('skiprows').value || undefined,
+                    skipfooter: document.getElementById('skipfooter').value || undefined,
+                    usecols: document.getElementById('usecols').value || undefined,
+                    index_col: document.getElementById('index_col').value || undefined,
+                    parse_dates: document.getElementById('parse_dates').value || undefined,
+                    na_values: document.getElementById('na_values').value || undefined,
+                    skip_blank_lines: document.getElementById('skip_blank_lines').checked
+                };
+                
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('read_func', readConfig.read_func);
+                formData.append('sep', readConfig.sep);
+                formData.append('encoding', readConfig.encoding);
+                formData.append('header', readConfig.header);
+                formData.append('names', readConfig.names);
+                
+                if (readConfig.nrows) formData.append('nrows', readConfig.nrows);
+                if (readConfig.skiprows) formData.append('skiprows', readConfig.skiprows);
+                if (readConfig.skipfooter) formData.append('skipfooter', readConfig.skipfooter);
+                if (readConfig.usecols) formData.append('usecols', readConfig.usecols);
+                if (readConfig.index_col) formData.append('index_col', readConfig.index_col);
+                if (readConfig.parse_dates) formData.append('parse_dates', readConfig.parse_dates);
+                if (readConfig.na_values) formData.append('na_values', readConfig.na_values);
+                formData.append('skip_blank_lines', readConfig.skip_blank_lines);
+                
+                fetch('/api/read-data', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success) {
+                        const dataDesc = document.getElementById('data_desc').value;
+                        addDataCard(fileName, result.data, result.row_count, result.col_count, false, 'dataframe', dataDesc || '(导入数据)');
+                        
+                        const fileSuffix = fileName.split('.').pop().toLowerCase();
+                        const fullFilePath = result.server_path || file.path || fileName;
+                        saveDataDesc(fullFilePath, fileSuffix, readConfig, dataDesc);
+                        
+                        resolve(result);
+                    } else {
+                        alert(`读取文件 ${fileName} 失败: ${result.error}`);
+                        reject(result.error);
+                    }
+                })
+                .catch(error => {
+                    alert(`读取文件 ${fileName} 失败: ${error.message}`);
+                    reject(error);
+                });
+            });
+        }
+        
+        function addDataCard(fileName, data, rowCount, colCount, isStatsResult = false, dataType = 'dataframe', desc = '', indexInfo = null, rawData = null) {
             emptyState.style.display = 'none';
             statsSection.style.display = 'block';
             
@@ -685,13 +748,15 @@
                 existingCard.querySelector('.preview-note').textContent = showAll ? `显示全部 ${data.length} 行数据` : `显示前 ${Math.min(10, data.length)} 行数据 | 共 ${rowCount} 行 ${colCount} 列`;
                 existingCard.querySelector('.toggle-display-btn').textContent = showAll ? '显示部分' : '显示全部';
                 const table = existingCard.querySelector('table');
-                renderTable(data, table.id, showAll);
-                
                 const listItem = dataList.find(item => item.id === cardId);
                 if (listItem) {
+                    renderTable(data, table.id, showAll, listItem.indexInfo || null);
                     listItem.data = data;
+                    listItem.rawData = rawData || data;
                     listItem.rowCount = rowCount;
                     listItem.colCount = colCount;
+                    listItem.desc = desc;
+                    listItem.indexInfo = indexInfo;
                 }
             } else {
                 const cardId = 'data-card-' + Date.now();
@@ -704,6 +769,7 @@
                 
                 const previewNote = isStatsResult ? `显示全部 ${data.length} 行数据` : `显示前 ${Math.min(10, data.length)} 行数据 | 共 ${rowCount} 行 ${colCount} 列`;
                 const toggleBtnText = isStatsResult ? '显示部分' : '显示全部';
+                const descText = desc || (isStatsResult ? '(统计结果)' : '(导入数据)');
                 
                 card.innerHTML = `
                     <div class="data-card-header">
@@ -717,9 +783,13 @@
                         <div style="display: flex; gap: 5px; align-items: center;">
                             <button class="btn btn-secondary btn-sm toggle-display-btn" onclick="toggleDisplay('${cardId}')">${toggleBtnText}</button>
                             <button class="btn btn-primary btn-sm" onclick="navigateToVisualization('${cardId}')">可视化</button>
+                            <button class="btn btn-success btn-sm" onclick="downloadData('${cardId}')">保存数据</button>
                             <button class="btn btn-danger btn-sm" onclick="removeDataCard('${cardId}', '${fileName}')">删除数据</button>
                             <span style="margin-left: 10px; padding: 4px 8px; background: #e9ecef; border-radius: 4px; font-size: 12px; color: #495057;">
                                 类型: ${dataType === 'series' ? 'Series' : 'DataFrame'}
+                            </span>
+                            <span style="padding: 4px 8px; background: #d4edda; border-radius: 4px; font-size: 12px; color: #155724; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${descText}">
+                                ${descText}
                             </span>
                         </div>
                     </div>
@@ -736,16 +806,19 @@
                     dataListContainer.appendChild(card);
                 }
                 
-                renderTable(data, `${cardId}-table`, isStatsResult);
+                renderTable(data, `${cardId}-table`, isStatsResult, indexInfo);
                 
                 dataList.push({
                     id: cardId,
                     fileName: fileName,
                     data: data,
+                    rawData: rawData || data,
                     rowCount: rowCount,
                     colCount: colCount,
                     dataType: dataType,
-                    file: fileDataMap.get(fileName)?.file || null
+                    file: fileDataMap.get(fileName)?.file || null,
+                    desc: desc,
+                    indexInfo: indexInfo
                 });
             }
             
@@ -768,7 +841,7 @@
             card.querySelector('.preview-note').textContent = previewNote;
             card.querySelector('.toggle-display-btn').textContent = newShowAll ? '显示部分' : '显示全部';
             
-            renderTable(listItem.data, `${cardId}-table`, newShowAll);
+            renderTable(listItem.data, `${cardId}-table`, newShowAll, listItem.indexInfo || null);
         }
         
         function navigateToVisualization(cardId) {
@@ -781,16 +854,19 @@
             const dataToSend = {
                 fileName: listItem.fileName,
                 data: listItem.data,
+                rawData: listItem.rawData,
                 rowCount: listItem.rowCount,
                 colCount: listItem.colCount,
-                dataType: listItem.dataType || 'dataframe'
+                dataType: listItem.dataType || 'dataframe',
+                desc: listItem.desc || '',
+                indexInfo: listItem.indexInfo || null
             };
             
-            sessionStorage.setItem('visualizationData', JSON.stringify(dataToSend));
-            window.location.href = '/visualization';
+            localStorage.setItem('visualizationData', JSON.stringify(dataToSend));
+            window.open('/visualization', '_blank');
         }
         
-        function renderTable(data, tableId, showAll = false) {
+        function renderTable(data, tableId, showAll = false, indexInfo = null) {
             const table = document.getElementById(tableId);
             if (!table) return;
             
@@ -802,10 +878,13 @@
             }
             
             const headers = Object.keys(data[0]);
+            const displayHeaders = indexInfo && indexInfo.has_index && indexInfo.index_name 
+                ? [indexInfo.index_name, ...headers] 
+                : headers;
             
             const thead = document.createElement('thead');
             const headerRow = document.createElement('tr');
-            headers.forEach(header => {
+            displayHeaders.forEach(header => {
                 const th = document.createElement('th');
                 th.textContent = header;
                 headerRow.appendChild(th);
@@ -815,8 +894,14 @@
             
             const tbody = document.createElement('tbody');
             const displayData = showAll ? data : data.slice(0, 10);
-            displayData.forEach(row => {
+            displayData.forEach((row, idx) => {
                 const tr = document.createElement('tr');
+                if (indexInfo && indexInfo.has_index) {
+                    const indexTd = document.createElement('td');
+                    const actualIdx = showAll ? idx : idx;
+                    indexTd.textContent = indexInfo.index_values[actualIdx] !== undefined ? indexInfo.index_values[actualIdx] : '';
+                    tr.appendChild(indexTd);
+                }
                 headers.forEach(header => {
                     const td = document.createElement('td');
                     td.textContent = row[header] !== undefined ? row[header] : '';
@@ -825,6 +910,45 @@
                 tbody.appendChild(tr);
             });
             table.appendChild(tbody);
+        }
+        
+        function downloadData(cardId) {
+            const listItem = dataList.find(item => item.id === cardId);
+            if (!listItem) {
+                alert('未找到数据');
+                return;
+            }
+            
+            const data = listItem.data;
+            if (!data || data.length === 0) {
+                alert('数据为空');
+                return;
+            }
+            
+            const headers = Object.keys(data[0]);
+            const rows = data.map(row => headers.map(header => {
+                const value = row[header];
+                if (value === null || value === undefined) {
+                    return '';
+                }
+                const strValue = String(value);
+                if (strValue.includes(',') || strValue.includes('"') || strValue.includes('\n')) {
+                    return `"${strValue.replace(/"/g, '""')}"`;
+                }
+                return strValue;
+            }).join(','));
+            
+            const csv = [headers.join(','), ...rows].join('\n');
+            
+            const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `${listItem.fileName.replace(/\.[^/.]+$/, '')}_download.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         }
         
         function removeDataCard(cardId, fileName) {
@@ -861,6 +985,136 @@
             }
         }
         
+        document.addEventListener('DOMContentLoaded', function() {
+            loadHistoryList();
+        });
+        
+        async function loadHistoryList() {
+            try {
+                const response = await fetch('/api/get-data-desc-list');
+                const result = await response.json();
+                
+                if (result.success) {
+                    const select = document.getElementById('history-select');
+                    select.innerHTML = '<option value="">选择历史数据...</option>';
+                    
+                    result.data.forEach(record => {
+                        const option = document.createElement('option');
+                        option.value = record.id;
+                        option.textContent = record.file_path;
+                        select.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('加载历史记录失败:', error);
+            }
+        }
+        
+        function loadHistoryConfig() {
+            const select = document.getElementById('history-select');
+            const recordId = select.value;
+            
+            if (!recordId) {
+                return;
+            }
+            
+            fetch(`/api/get-data-desc/${recordId}`)
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success) {
+                        const data = result.data;
+                        
+                        document.getElementById('read_func').value = data.file_suffix === 'xlsx' || data.file_suffix === 'xls' ? 'excel' : 'csv';
+                        document.getElementById('data_desc').value = data.desc || '';
+                        
+                        const config = data.read_config;
+                        if (config.sep) document.getElementById('sep').value = config.sep;
+                        if (config.encoding) document.getElementById('encoding').value = config.encoding;
+                        if (config.header !== undefined) document.getElementById('header').value = config.header;
+                        if (config.names) document.getElementById('names').value = config.names;
+                        if (config.nrows) document.getElementById('nrows').value = config.nrows;
+                        if (config.skiprows) document.getElementById('skiprows').value = config.skiprows;
+                        if (config.skipfooter) document.getElementById('skipfooter').value = config.skipfooter;
+                        if (config.usecols) document.getElementById('usecols').value = config.usecols;
+                        if (config.index_col) document.getElementById('index_col').value = config.index_col;
+                        if (config.parse_dates) document.getElementById('parse_dates').value = config.parse_dates;
+                        if (config.na_values) document.getElementById('na_values').value = config.na_values;
+                        if (config.skip_blank_lines !== undefined) document.getElementById('skip_blank_lines').checked = config.skip_blank_lines;
+                        
+                        addHistoryToQueue(data);
+                    }
+                })
+                .catch(error => {
+                    console.error('加载配置失败:', error);
+                });
+        }
+        
+        function addHistoryToQueue(record) {
+            const filePath = record.file_path;
+            const fileName = filePath.split(/[\\/]/).pop();
+            
+            fileDataMap.set(fileName, {
+                filePath: filePath,
+                fileSuffix: record.file_suffix,
+                readConfig: record.read_config,
+                isHistory: true,
+                desc: record.desc || ''
+            });
+            
+            updateFileInfo();
+        }
+        
+        async function readFromHistory() {
+            if (!currentHistoryRecord) {
+                alert('请先选择历史记录');
+                return;
+            }
+            
+            const filePath = currentHistoryRecord.file_path;
+            const fileName = filePath.split(/[\\/]/).pop();
+            
+            if (!fileDataMap.has(fileName)) {
+                fileDataMap.set(fileName, {
+                    filePath: filePath,
+                    fileSuffix: currentHistoryRecord.file_suffix,
+                    readConfig: currentHistoryRecord.read_config,
+                    isHistory: true
+                });
+                
+                updateFileInfo();
+                alert(`已添加历史数据: ${fileName}`);
+            } else {
+                alert(`数据 "${fileName}" 已存在`);
+            }
+            
+            document.getElementById('history-select').value = '';
+            currentHistoryRecord = null;
+        }
+        
+        async function saveDataDesc(filePath, fileSuffix, readConfig, desc) {
+            try {
+                const response = await fetch('/api/save-data-desc', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        file_path: filePath,
+                        file_suffix: fileSuffix,
+                        read_config: readConfig,
+                        desc: desc
+                    })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    console.log('数据配置保存成功:', result.id);
+                    loadHistoryList();
+                } else if (result.duplicate) {
+                    console.log('文件路径已存在，跳过保存:', filePath);
+                }
+            } catch (error) {
+                console.error('保存数据配置失败:', error);
+            }
+        }
+        
         statsBtn.addEventListener('click', async function() {
             const selectedCards = document.querySelectorAll('.checkbox-select:checked');
             const requirement = statsRequirement.value.trim();
@@ -889,6 +1143,7 @@
                     const formData = new FormData();
                     formData.append('file', selectedData.file);
                     formData.append('requirement', requirement);
+                    formData.append('data_desc', document.getElementById('data_desc').value);
                     formData.append('read_func', document.getElementById('read_func').value);
                     formData.append('sep', document.getElementById('sep').value);
                     formData.append('encoding', document.getElementById('encoding').value);
@@ -907,7 +1162,8 @@
                         },
                         body: JSON.stringify({
                             data: selectedData.data,
-                            requirement: requirement
+                            requirement: requirement,
+                            data_desc: document.getElementById('data_desc').value
                         })
                     });
                 }
@@ -919,23 +1175,50 @@
                     statsRaw.textContent = result.raw_response || '无原始输出';
                     
                     if (result.result) {
-                        const resultFileName = `${selectedData.fileName}_stats_result_${Date.now()}`;
-                        
-                        let formattedData = result.result;
-                        let actualRowCount = result.row_count;
-                        let actualColCount = result.col_count;
-                        
-                        if (result.data_type === 'series') {
-                            formattedData = result.result.index.map((idx, i) => ({
-                                [result.result.name || 'index']: idx,
-                                value: result.result.values[i]
-                            }));
-                            actualRowCount = result.result.index.length;
-                            actualColCount = 2;
+                            const resultFileName = `${selectedData.fileName}_stats_result_${Date.now()}`;
+                            
+                            let formattedData = result.result;
+                            let actualRowCount = result.row_count;
+                            let actualColCount = result.col_count;
+                            let rawResult = result.result;
+                            
+                            if (result.data_type === 'series') {
+                                if (result.result.is_multi_index && result.result.index_names) {
+                                    formattedData = result.result.index.map((idx, i) => {
+                                        const row = {};
+                                        result.result.index_names.forEach((name, j) => {
+                                            row[name || `level_${j}`] = idx[j];
+                                        });
+                                        row[result.result.name || 'value'] = result.result.values[i];
+                                        return row;
+                                    });
+                                    actualRowCount = result.result.index.length;
+                                    actualColCount = result.result.index_names.length + 1;
+                                } else {
+                                    formattedData = result.result.index.map((idx, i) => ({
+                                        index: idx,
+                                        [result.result.name || 'value']: result.result.values[i]
+                                    }));
+                                    actualRowCount = result.result.index.length;
+                                    actualColCount = 2;
+                                }
+                            }
+                            
+                            // 确保传递索引信息，无论数据类型如何
+                            let indexInfo = null;
+                            if (result.index_info) {
+                                indexInfo = result.index_info;
+                            } else if (result.data_type === 'series') {
+                                // 为Series创建索引信息
+                                indexInfo = {
+                                    has_index: true,
+                                    index_name: result.result.name || 'index',
+                                    index_values: result.result.index
+                                };
+                            }
+                            
+                            addDataCard(resultFileName, formattedData, actualRowCount, actualColCount, true, result.data_type, result.result_desc || '(统计结果)', indexInfo || result.index_info || null, rawResult);
                         }
-                        
-                        addDataCard(resultFileName, formattedData, actualRowCount, actualColCount, true, result.data_type);
-                    }
                 } else {
                     statsCode.textContent = `错误: ${result.error}`;
                     statsRaw.textContent = result.raw_response || '无原始输出';
