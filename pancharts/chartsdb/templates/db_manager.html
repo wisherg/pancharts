@@ -143,6 +143,31 @@
             color: #999;
             margin-top: 5px;
         }
+        .tabs {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 20px;
+        }
+        .tab-btn {
+            padding: 10px 20px;
+            background: #e9ecef;
+            border: none;
+            border-radius: 8px 8px 0 0;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            color: #495057;
+        }
+        .tab-btn.active {
+            background: #667eea;
+            color: white;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
     </style>
 </head>
 <body>
@@ -151,81 +176,148 @@
         <p>图表配置数据库管理</p>
         <div class="db-path">数据库: {{ db_path }}</div>
         <div style="margin-top: 10px;">
-            <a href="/data-reader" class="btn btn-primary" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3);">📊 数据文件读取</a>
+            <a href="/data-reader" target="_blank" class="btn btn-primary" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3);">📊 数据文件读取</a>
         </div>
     </div>
     
-    <div class="filter-section">
-        <h2>筛选查询</h2>
-        <form action="/" method="get" class="filter-form">
-            <div class="filter-group">
-                <label for="tag0">标签0</label>
-                <input type="text" id="tag0" name="tag0" value="{{ filter_tag0 or '' }}" placeholder="输入标签0">
-            </div>
-            
-            <div class="filter-group">
-                <label for="tag1">标签1</label>
-                <input type="text" id="tag1" name="tag1" value="{{ filter_tag1 or '' }}" placeholder="输入标签1">
-            </div>
-            
-            <div class="filter-group">
-                <label for="start_time">开始时间</label>
-                <input type="text" id="start_time" name="start_time" value="{{ filter_start_time or '' }}" placeholder="如: 2024-01-01">
-            </div>
-            
-            <div class="filter-group">
-                <label for="end_time">结束时间</label>
-                <input type="text" id="end_time" name="end_time" value="{{ filter_end_time or '' }}" placeholder="如: 2024-12-31">
-            </div>
-            
-            <div class="filter-group">
-                <label for="file_path">文件路径</label>
-                <input type="text" id="file_path" name="file_path" value="{{ filter_file_path or '' }}" placeholder="输入文件路径">
-            </div>
-            
-            <button type="submit" class="btn btn-primary">查询</button>
-            <a href="/" class="btn btn-secondary">重置</a>
-            <button type="button" id="batch-preview-btn" class="btn btn-primary">批量预览</button>
-        </form>
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('charts')">📈 图表配置</button>
+        <button class="tab-btn" onclick="switchTab('data-desc')">📄 数据描述</button>
     </div>
     
-    <div class="table-section">
-        <table>
-            <tr>
-                <th><input type="checkbox" id="select-all" onchange="toggleSelectAll()"></th>
-                <th>ID</th>
-                <th>时间</th>
-                <th>标签0</th>
-                <th>标签1</th>
-                <th>文件路径</th>
-                <th>操作</th>
-            </tr>
-            {% if records %}
-            {% for record in records %}
-            <tr>
-                <td><input type="checkbox" class="record-checkbox" value="{{ record.id }}"></td>
-                <td>{{ record.id }}</td>
-                <td>{{ record.insert_time[:19] }}</td>
-                <td>{{ record.tag0 or '' }}</td>
-                <td>{{ record.tag1 or '' }}</td>
-                <td class="truncate" title="{{ record.file_path }}">{{ record.file_path }}</td>
-                <td class="action-links">
-                    <a href="/record/{{ record.id }}">查看</a>
-                    <a href="/edit/{{ record.id }}">编辑</a>
-                    <form action="/delete/{{ record.id }}" method="post" style="display: inline;" onsubmit="return confirm('确定删除?')">
-                        <button type="submit" class="btn btn-danger" style="padding: 2px 8px; font-size: 12px;">删除</button>
-                    </form>
-                </td>
-            </tr>
-            {% endfor %}
-            {% else %}
-            <tr>
-                <td colspan="7">
-                    <div class="no-records">没有找到匹配的记录</div>
-                </td>
-            </tr>
-            {% endif %}
-        </table>
+    <div id="charts-tab" class="tab-content active">
+        <div class="filter-section">
+            <h2>筛选查询</h2>
+            <form action="/" method="get" class="filter-form">
+                <div class="filter-group">
+                    <label for="tag0">标签0</label>
+                    <input type="text" id="tag0" name="tag0" value="{{ filter_tag0 or '' }}" placeholder="输入标签0">
+                </div>
+                
+                <div class="filter-group">
+                    <label for="tag1">标签1</label>
+                    <input type="text" id="tag1" name="tag1" value="{{ filter_tag1 or '' }}" placeholder="输入标签1">
+                </div>
+                
+                <div class="filter-group">
+                    <label for="start_time">开始时间</label>
+                    <input type="text" id="start_time" name="start_time" value="{{ filter_start_time or '' }}" placeholder="如: 2024-01-01">
+                </div>
+                
+                <div class="filter-group">
+                    <label for="end_time">结束时间</label>
+                    <input type="text" id="end_time" name="end_time" value="{{ filter_end_time or '' }}" placeholder="如: 2024-12-31">
+                </div>
+                
+                <div class="filter-group">
+                    <label for="file_path">文件路径</label>
+                    <input type="text" id="file_path" name="file_path" value="{{ filter_file_path or '' }}" placeholder="输入文件路径">
+                </div>
+                
+                <button type="submit" class="btn btn-primary">查询</button>
+                <a href="/" class="btn btn-secondary">重置</a>
+                <button type="button" id="batch-preview-btn" class="btn btn-primary">批量预览</button>
+            </form>
+        </div>
+        
+        <div class="table-section">
+            <table>
+                <tr>
+                    <th><input type="checkbox" id="select-all" onchange="toggleSelectAll()"></th>
+                    <th>ID</th>
+                    <th>时间</th>
+                    <th>标签0</th>
+                    <th>标签1</th>
+                    <th>数据描述</th>
+                    <th>数据洞察</th>
+                    <th>文件路径</th>
+                    <th>操作</th>
+                </tr>
+                {% if records %}
+                {% for record in records %}
+                <tr>
+                    <td><input type="checkbox" class="record-checkbox" value="{{ record.id }}"></td>
+                    <td>{{ record.id }}</td>
+                    <td>{{ record.insert_time[:19] }}</td>
+                    <td>{{ record.tag0 or '' }}</td>
+                    <td>{{ record.tag1 or '' }}</td>
+                    <td class="truncate" title="{{ record.data_desc or '' }}">{{ record.data_desc or '' }}</td>
+                    <td class="truncate" title="{{ record.data_insight or '' }}">{{ record.data_insight or '' }}</td>
+                    <td class="truncate" title="{{ record.file_path }}">{{ record.file_path }}</td>
+                    <td class="action-links">
+                        <a href="/record/{{ record.id }}" target="_blank">查看</a>
+                        <a href="/edit/{{ record.id }}" target="_blank">编辑</a>
+                        <form action="/delete/{{ record.id }}" method="post" style="display: inline;" onsubmit="return confirm('确定删除?')">
+                            <button type="submit" class="btn btn-danger" style="padding: 2px 8px; font-size: 12px;">删除</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+                {% else %}
+                <tr>
+                    <td colspan="9">
+                        <div class="no-records">没有找到匹配的记录</div>
+                    </td>
+                </tr>
+                {% endif %}
+            </table>
+        </div>
+    </div>
+    
+    <div id="data-desc-tab" class="tab-content">
+        <div class="filter-section">
+            <h2>筛选查询</h2>
+            <form id="data-desc-filter-form" class="filter-form">
+                <div class="filter-group">
+                    <label for="desc-file-path">文件路径</label>
+                    <input type="text" id="desc-file-path" name="file_path" placeholder="输入文件路径">
+                </div>
+                
+                <div class="filter-group">
+                    <label for="desc-file-suffix">文件后缀</label>
+                    <input type="text" id="desc-file-suffix" name="file_suffix" placeholder="如: csv, xlsx">
+                </div>
+                
+                <div class="filter-group">
+                    <label for="desc-content">数据描述</label>
+                    <input type="text" id="desc-content" name="desc" placeholder="输入描述关键词">
+                </div>
+                
+                <div class="filter-group">
+                    <label for="desc-start-time">开始时间</label>
+                    <input type="text" id="desc-start-time" name="start_time" placeholder="如: 2024-01-01">
+                </div>
+                
+                <div class="filter-group">
+                    <label for="desc-end-time">结束时间</label>
+                    <input type="text" id="desc-end-time" name="end_time" placeholder="如: 2024-12-31">
+                </div>
+                
+                <button type="button" class="btn btn-primary" onclick="loadDataDescList()">查询</button>
+                <button type="button" class="btn btn-secondary" onclick="resetDataDescFilter()">重置</button>
+            </form>
+        </div>
+        
+        <div class="table-section">
+            <table id="data-desc-table">
+                <tr>
+                    <th>ID</th>
+                    <th>时间</th>
+                    <th>文件路径</th>
+                    <th>文件后缀</th>
+                    <th>数据描述</th>
+                    <th>读取配置</th>
+                    <th>操作</th>
+                </tr>
+                <tbody id="data-desc-tbody">
+                    <tr>
+                        <td colspan="7">
+                            <div class="no-records">点击查询按钮加载数据</div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
     </div>
     
     <script>
@@ -246,6 +338,117 @@
             
             window.location.href = '/batch-preview?ids=' + ids.join(',');
         });
+        
+        // Tab切换功能
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            if (tabName === 'charts') {
+                document.querySelector('.tab-btn').classList.add('active');
+                document.getElementById('charts-tab').classList.add('active');
+            } else {
+                document.querySelectorAll('.tab-btn')[1].classList.add('active');
+                document.getElementById('data-desc-tab').classList.add('active');
+                loadDataDescList();
+            }
+        }
+        
+        // 加载data_desc列表
+        async function loadDataDescList() {
+            const filePath = document.getElementById('desc-file-path').value;
+            const fileSuffix = document.getElementById('desc-file-suffix').value;
+            const desc = document.getElementById('desc-content').value;
+            const startTime = document.getElementById('desc-start-time').value;
+            const endTime = document.getElementById('desc-end-time').value;
+            
+            let queryParams = [];
+            if (filePath) queryParams.push(`file_path=${encodeURIComponent(filePath)}`);
+            if (fileSuffix) queryParams.push(`file_suffix=${encodeURIComponent(fileSuffix)}`);
+            if (desc) queryParams.push(`desc=${encodeURIComponent(desc)}`);
+            if (startTime) queryParams.push(`start_time=${encodeURIComponent(startTime)}`);
+            if (endTime) queryParams.push(`end_time=${encodeURIComponent(endTime)}`);
+            
+            const url = '/api/data-desc-list' + (queryParams.length > 0 ? '?' + queryParams.join('&') : '');
+            
+            try {
+                const response = await fetch(url);
+                const result = await response.json();
+                
+                if (result.success) {
+                    renderDataDescTable(result.data);
+                } else {
+                    alert('加载失败: ' + result.error);
+                }
+            } catch (error) {
+                alert('加载失败: ' + error.message);
+            }
+        }
+        
+        // 渲染data_desc表格
+        function renderDataDescTable(data) {
+            const tbody = document.getElementById('data-desc-tbody');
+            
+            if (!data || data.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7">
+                            <div class="no-records">没有找到匹配的记录</div>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            tbody.innerHTML = data.map(record => {
+                const configStr = JSON.stringify(record.read_config || {}, null, 1);
+                return `
+                    <tr>
+                        <td>${record.id}</td>
+                        <td>${record.insert_time ? record.insert_time.slice(0, 19) : ''}</td>
+                        <td class="truncate" title="${record.file_path}">${record.file_path}</td>
+                        <td>${record.file_suffix}</td>
+                        <td class="truncate" title="${record.desc}">${record.desc || ''}</td>
+                        <td class="truncate" title="${configStr}">${configStr}</td>
+                        <td class="action-links">
+                            <a href="/data-desc-edit/${record.id}" target="_blank">编辑</a>
+                            <a href="javascript:void(0)" onclick="deleteDataDesc(${record.id})" style="color: #dc3545;">删除</a>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+        
+        // 重置data_desc筛选
+        function resetDataDescFilter() {
+            document.getElementById('desc-file-path').value = '';
+            document.getElementById('desc-file-suffix').value = '';
+            document.getElementById('desc-content').value = '';
+            document.getElementById('desc-start-time').value = '';
+            document.getElementById('desc-end-time').value = '';
+            loadDataDescList();
+        }
+        
+        // 删除data_desc记录
+        async function deleteDataDesc(id) {
+            if (!confirm('确定删除这条记录?')) return;
+            
+            try {
+                const response = await fetch(`/api/data-desc/${id}`, {
+                    method: 'DELETE'
+                });
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert('删除成功');
+                    loadDataDescList();
+                } else {
+                    alert('删除失败: ' + result.error);
+                }
+            } catch (error) {
+                alert('删除失败: ' + error.message);
+            }
+        }
     </script>
 </body>
 </html>
