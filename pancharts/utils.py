@@ -8,8 +8,23 @@ Pancharts工具模块
 
 import re
 import random
+import os
+import sys
+import sqlite3
+from datetime import datetime
 
 import pandas as pd
+
+
+# 向后兼容导入 - 从 chartsdb 模块导入
+try:
+    from .chartsdb.utils import init_pancharts_db, open_db_manager
+except ImportError:
+    def init_pancharts_db(directory: str = None) -> str:
+        raise ImportError("chartsdb模块未找到，请确保chartsdb目录存在")
+    
+    def open_db_manager(host: str = "0.0.0.0", port: int = 8000):
+        raise ImportError("chartsdb模块未找到，请确保chartsdb目录存在")
 
 
 def add_quotes_to_keys(json_str):
