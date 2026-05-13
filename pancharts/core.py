@@ -504,6 +504,83 @@ class Pancharts:
             "amap_map_js_path": amap_map_js_path
         }
     
+    def to_db(self, tag0: str = "", tag1: str = "") -> dict:
+        """
+        将当前图表配置保存到SQLite数据库
+        
+        参数：
+            tag0: str - 自定义标签0，默认为空字符串
+            tag1: str - 自定义标签1，默认为空字符串
+        
+        返回：
+            dict - 包含执行结果的字典，格式为：
+                {"success": True, "message": "数据保存成功"} 或
+                {"success": False, "message": "错误原因"}
+        
+        说明：
+            使用 chart_config.py 中的 SQLITE_DB_PATH 配置来定位数据库
+        """
+        try:
+            import sqlite3
+            import json
+            import sys
+            
+            from .chart_config import SQLITE_DB_PATH
+            
+            # 检查 SQLITE_DB_PATH 是否配置
+            if not SQLITE_DB_PATH:
+                return {
+                    "success": False,
+                    "message": "SQLITE_DB_PATH 未配置，请先在 chart_config.py 中配置数据库路径。\n"
+                               "使用方法：\n"
+                               "1. 使用 init_pancharts_db(directory) 创建数据库\n"
+                               "2. 在 chart_config.py 中设置 SQLITE_DB_PATH = '数据库文件路径'"
+                }
+            
+            db_path = SQLITE_DB_PATH
+            
+            # 获取当前程序所在文件路径（包含文件名）
+            file_path = ""
+            if hasattr(sys.modules['__main__'], '__file__'):
+                file_path = os.path.abspath(sys.modules['__main__'].__file__)
+            else:
+                # 在 Jupyter Notebook 等环境中，尝试从调用栈获取
+                try:
+                    import inspect
+                    frame = inspect.stack()[-1]
+                    file_path = os.path.abspath(frame.filename)
+                except:
+                    file_path = os.getcwd()
+            
+            # 如果获取到的是目录，则使用当前工作目录
+            if not file_path or os.path.isdir(file_path):
+                file_path = os.getcwd()
+            
+            # 获取 option 和 data_config
+            option_json = json.dumps(self.option, ensure_ascii=False, indent=2)
+            data_config_json = json.dumps(self._data_config, ensure_ascii=False, indent=2)
+            
+            # 获取当前时间
+            from datetime import datetime
+            insert_time = datetime.now().isoformat()
+            
+            # 连接数据库并插入数据
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+                INSERT INTO pancharts_options (insert_time, option, data_option, file_path, tag0, tag1)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (insert_time, option_json, data_config_json, file_path, tag0, tag1))
+            
+            conn.commit()
+            conn.close()
+            
+            return {"success": True, "message": "数据保存成功"}
+        
+        except Exception as e:
+            return {"success": False, "message": f"保存失败: {str(e)}"}
+    
     def render(self, filename="index.html", output_dir="."):
         """
         渲染HTML文件
@@ -563,6 +640,74 @@ class Pancharts:
             f.write(html_content)
         
         return str(html_file_path)
+    
+    def render_emb(self):
+        """
+        渲染用于嵌入到其他网页的图表片段
+
+        返回：
+            dict - 包含嵌入所需的所有信息：
+                - html: str - 图表HTML片段（包含div和初始化脚本）
+                - js_dependencies: list - 需要引入的JavaScript依赖URL列表
+                - random_id: int - 图表容器的随机ID
+        """
+        # 生成随机ID，避免冲突
+        random_id = random.randint(10000, 99999)
+        
+        # 准备渲染数据
+        render_data = self.prepare_render_data()
+        
+        # 获取描述信息 - 先从合并后的 option 获取，再从 _user_option 回退
+        merged_option = self.option
+        desc = merged_option.get("desc", self._user_option.get("desc", ""))
+        
+        # 设置模板环境
+        env = Environment(loader=FileSystemLoader(str(self._template_dir)))
+        template = env.get_template('template_emb.html')
+        
+        # 构建渲染选项字典 - 完整传递所有必要参数
+        emb_option = {
+            "option": render_data["rendered_option"],
+            "random_id": random_id,
+            "width": self._width,
+            "height": self._height,
+            "renderer": self._renderer,
+            "theme": self._theme,
+            "is_amap_chart": render_data["is_amap_chart"],
+            "desc": desc
+        }
+        
+        # 渲染模板
+        html_content = template.render(**emb_option)
+        
+        # 收集需要的JavaScript依赖
+        js_dependencies = []
+        
+        # ECharts主库
+        js_dependencies.append(render_data["echarts_js_path"])
+        
+        # ECharts GL（如果需要）
+        if render_data["use_echarts_gl"]:
+            js_dependencies.append(render_data["echarts_gl_js_path"])
+        
+        # ECharts WordCloud（如果需要）
+        if render_data["use_echarts_wordcloud"]:
+            js_dependencies.append(render_data["echarts_wordcloud_js_path"])
+        
+        # 地图数据（如果需要）
+        if self.is_map_chart and render_data["map_url"]:
+            js_dependencies.append(render_data["map_url"])
+        
+        # 高德地图相关（如果需要）
+        if render_data["is_amap_chart"]:
+            js_dependencies.append(render_data["amap_js_path"])
+            js_dependencies.append(render_data["amap_map_js_path"])
+        
+        return {
+            "html": html_content,
+            "js_dependencies": js_dependencies,
+            "random_id": random_id
+        }
     
     def render_notebook(self):
         """
