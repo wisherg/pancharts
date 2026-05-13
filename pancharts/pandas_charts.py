@@ -82,10 +82,8 @@ class k_v:
         self.xaxis_type = get_index_type(data)
         self.yaxis_type = get_value_type(data)
         self.base_data = []
-        self.xdata = []
         for i in data.items():
             self.base_data.append({"name": i[0], "value": i[1]})
-            self.xdata.append(i[0])
         
         # 按照优先级：data.index.name > data.name > ""
         self.legend = ""
@@ -94,20 +92,30 @@ class k_v:
         elif data.name:
             self.legend = data.name
 
+        # 根据轴类型选择数据格式
+        if self.xaxis_type == "category" or self.yaxis_type == "category":
+            series_data = self.base_data
+        else:
+            series_data = self.rect_data
+        
+        # 构建配置
         self.rect_data_config = {
             'xAxis': {
-                'type': self.xaxis_type,
-                'data': self.xdata
+                'type': self.xaxis_type
             },
             'yAxis': {
                 'type': self.yaxis_type
             },
             'series': [
                 {
-                    'data': self.base_data, "name": self.legend
+                    'data': series_data, "name": self.legend
                 }
             ]
         }
+        
+        # 当x轴为category类型时，确保xAxis包含data属性
+        if self.xaxis_type == "category":
+            self.rect_data_config['xAxis']['data'] = list(data.index)
         self.base_data_config = {
             "title": {
                 "text": self.legend
