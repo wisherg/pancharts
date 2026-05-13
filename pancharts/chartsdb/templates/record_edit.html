@@ -295,6 +295,20 @@
             </div>
             
             <div class="card">
+                <div class="info-grid">
+                    <span class="card-title">数据描述与洞察</span>
+                    <div class="tag-item" style="flex-basis: 100%;">
+                        <span class="tag-label" style="display: block; margin-bottom: 5px;">数据描述:</span>
+                        <textarea name="data_desc" class="tag-input" style="min-height: 100px; font-family: inherit;" placeholder="输入数据描述">{{ record.data_desc or '' }}</textarea>
+                    </div>
+                    <div class="tag-item" style="flex-basis: 100%;">
+                        <span class="tag-label" style="display: block; margin-bottom: 5px;">数据洞察:</span>
+                        <textarea name="data_insight" class="tag-input" style="min-height: 100px; font-family: inherit;" placeholder="输入数据洞察">{{ record.data_insight or '' }}</textarea>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
                 <div class="card-header">
                     <h2>Option 配置</h2>
                 </div>
