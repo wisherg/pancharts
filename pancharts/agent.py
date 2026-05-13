@@ -188,3 +188,139 @@ def echat(question: str) -> None:
     
     # 打印结果
     print(response)
+
+
+def desc_chat(user_requirement: str, data_config: str, max_words: int = 200) -> str:
+    """
+    基于数据配置项和用户要求进行专业数据分析，返回数据特征和统计意义
+    
+    参数：
+        user_requirement: str - 用户的分析要求
+        data_config: str - 数据配置项（JSON格式）
+        max_words: int - 输出的最大字数，默认200字
+        
+    返回：
+        str - 分析结果文本
+    """
+    # 系统提示词
+    system_prompt = f"""你是一个专业的数据分析师。请根据提供的数据配置和用户要求，进行深入的数据分析。
+
+分析内容应该包括：
+1. 数据的整体特征和趋势
+2. 关键统计指标（如最大值、最小值、平均值等，根据数据类型而定）
+3. 数据所呈现的模式和规律
+4. 数据的商业或业务意义
+5. 可能的结论和建议
+
+输出要求：
+- 使用清晰的中文表达
+- 结构合理，条理清晰
+- 分析要有深度，不只是简单描述数据
+- 保持专业、客观的语气
+- 输出为纯文本，不包含JSON格式
+- 控制在{max_words}字以内"""  
+    
+    # 用户提示词
+    user_prompt = f"""用户分析要求: {user_requirement}
+
+数据配置项:
+{data_config}
+"""
+    
+    # 计算max_tokens，大概1个汉字等于1.5个token，留一些余量
+    max_tokens = int(max_words * 3)
+    
+    # 调用AI API
+    response = call_openai_api(system_prompt, user_prompt, temperature=0.5, max_tokens=max_tokens)
+    
+    return response
+
+
+def data_chat(data, user_requirement: str) -> dict:
+    """
+    基于数据和用户需求生成并执行pandas统计代码
+    
+    参数：
+        data: pd.DataFrame 或 pd.Series - 要进行统计的数据
+        user_requirement: str - 用户的统计需求
+        
+    返回：
+        dict - 包含统计结果(result)和执行的代码(code)
+    """
+    import pandas as pd
+    import io
+    
+    info_buffer = io.StringIO()
+    data.info(buf=info_buffer)
+    data_info = info_buffer.getvalue()
+    
+    columns_info = f"列名: {list(data.columns) if isinstance(data, pd.DataFrame) else 'Series'}"
+    dtypes_info = f"数据类型:\n{data.dtypes.to_string()}"
+    
+    system_prompt = """你是一个专业的Python数据分析师。请根据用户的统计需求和数据信息，生成正确的pandas代码。
+
+注意事项：
+1. 代码必须基于变量 `data` 开始，data 是输入的DataFrame或Series
+2. 只能使用pandas库进行统计分析
+3. 代码必须是可执行的Python代码
+4. 只返回代码，不返回其他解释文字
+5. 如果是DataFrame，使用 data 作为变量名；如果是Series，也使用 data 作为变量名
+6. 支持单行或多行代码，多行代码时最后一行必须将结果赋值给变量 `result`
+7. 返回结果应该是统计计算的结果（DataFrame、Series或标量值）
+
+示例（单行）：
+用户需求: 计算各列的均值
+代码: data.mean()
+
+示例（多行）：
+用户需求: 分组统计后计算均值
+代码: 
+grouped = data.groupby('category')
+result = grouped['value'].mean()
+"""
+    
+    user_prompt = f"""数据信息:
+{data_info}
+
+{columns_info}
+
+{dtypes_info}
+
+用户统计需求: {user_requirement}
+
+请生成对应的pandas统计代码:"""
+    
+    response = call_openai_api(system_prompt, user_prompt, temperature=0.3, max_tokens=10000)
+    raw_response = response
+    
+    code = response.strip()
+    if code.startswith('```python'):
+        code = code[10:]
+    if code.endswith('```'):
+        code = code[:-3]
+    code = code.strip()
+    
+    try:
+        local_vars = {'data': data, 'pd': pd}
+        
+        if '\n' in code:
+            exec(code, globals(), local_vars)
+        else:
+            exec(f"result = {code}", globals(), local_vars)
+        
+        result = local_vars.get('result')
+        
+        return {
+            'result': result,
+            'code': code,
+            'raw_response': raw_response
+        }
+    except Exception as e:
+        print(f"代码执行失败: {str(e)}")
+        print(f"生成的代码: {code}")
+        return {
+            'result': None,
+            'code': code,
+            'error': str(e),
+            'raw_response': raw_response
+        }
