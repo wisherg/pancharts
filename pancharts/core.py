@@ -511,8 +511,8 @@ class Pancharts:
         参数：
             tag0: str - 自定义标签0，默认为空字符串
             tag1: str - 自定义标签1，默认为空字符串
-            data_desc: str - 数据描述，默认为空字符串
-            data_insight: str - 数据洞察，默认为空字符串
+            data_desc: str - 数据描述, 可选参数，数据各字段的意义，默认为空字符串
+            data_insight: str - 数据洞察, 可选参数，数据展现的特征与意义，默认为空字符串
         
         返回：
             dict - 包含执行结果的字典，格式为：
