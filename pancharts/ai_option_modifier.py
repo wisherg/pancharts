@@ -10,20 +10,7 @@ import json
 import datetime
 
 from .agent import call_openai_api, parse_json_response
-
-
-def _custom_json_serializer(obj):
-    """
-    自定义JSON序列化函数，处理非JSON可序列化对象
-    """
-    if isinstance(obj, datetime.datetime):
-        return obj.strftime('%Y-%m-%d %H:%M:%S')
-    elif isinstance(obj, datetime.date):
-        return obj.strftime('%Y-%m-%d')
-    elif hasattr(obj, '__dict__'):
-        return str(obj)
-    else:
-        raise TypeError(f'Object of type {type(obj).__name__} is not JSON serializable')
+from .utils import custom_json_serializer
 
 
 class AIOptionModifier:
@@ -63,7 +50,7 @@ class AIOptionModifier:
         """
         
         user_prompt = f"""
-        原始option: {json.dumps(current_option, ensure_ascii=False, default=_custom_json_serializer)}
+        原始option: {json.dumps(current_option, ensure_ascii=False, default=custom_json_serializer)}
         
         修改要求: {prompt}
         
@@ -103,7 +90,7 @@ class AIOptionModifier:
         """
         
         user_prompt = f"""
-        原始option: {json.dumps(current_option, ensure_ascii=False, default=_custom_json_serializer)}
+        原始option: {json.dumps(current_option, ensure_ascii=False, default=custom_json_serializer)}
         
         修改要求: {prompt}
         
