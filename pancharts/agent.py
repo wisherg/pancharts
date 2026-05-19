@@ -9,8 +9,10 @@ Pancharts Agent模块
 import json
 from openai import OpenAI
 
+from .chart_config import DEFAULT_AI_API_KEY, DEFAULT_AI_BASE_URL, DEFAULT_AI_MODEL_NAME
 
-def call_openai_api(system_prompt, user_prompt, temperature=0.7, max_tokens=2000):
+
+def call_openai_api(system_prompt: str, user_prompt: str, temperature: float = 0.7, max_tokens: int = 2000) -> str:
     """
     调用OpenAI API，包含客户端创建和API调用逻辑
     配置信息只从chart_config获取，不接受参数输入
@@ -22,9 +24,8 @@ def call_openai_api(system_prompt, user_prompt, temperature=0.7, max_tokens=2000
         max_tokens: int - 最大token数，默认2000
         
     返回：
-        str - API返回的原始内容，如果调用失败返回空字符串
+        str - API返回的原始内容，如果调用失败返回错误信息字符串
     """
-    from .chart_config import DEFAULT_AI_API_KEY, DEFAULT_AI_BASE_URL, DEFAULT_AI_MODEL_NAME
     
     try:
         # 创建客户端（配置信息只从配置文件获取）
@@ -48,12 +49,13 @@ def call_openai_api(system_prompt, user_prompt, temperature=0.7, max_tokens=2000
         return response.choices[0].message.content.strip()
         
     except Exception as e:
-        # 如果API调用失败，打印错误信息并返回空字符串
+        # 如果API调用失败，返回错误信息（便于前端显示）
+        error_msg = f"【API调用失败】错误类型: {type(e).__name__}\n错误信息: {str(e)}\n\n请检查：\n1. API密钥是否正确\n2. API地址是否可访问\n3. 网络连接是否正常"
         print(f"API调用失败: {str(e)}")
-        return ""
+        return error_msg
 
 
-def parse_json_response(response_content, verbose=False):
+def parse_json_response(response_content: str, verbose: bool = False) -> dict:
     """
     解析JSON响应，处理Markdown代码块标记
     
@@ -99,6 +101,9 @@ def parse_json_response(response_content, verbose=False):
         return {}
 
 
+import os
+
+
 def pchat(question: str) -> None:
     """
     基于pancharts项目文档回答用户问题
@@ -109,8 +114,6 @@ def pchat(question: str) -> None:
     返回：
         None - 通过print输出结果，不返回任何内容
     """
-    import os
-    
     # 获取文档路径
     doc_path = os.path.join(os.path.dirname(__file__), 'datasets', 'document_cn.md')
     doc_path = os.path.abspath(doc_path)
@@ -246,10 +249,11 @@ def data_chat(data, user_requirement: str, data_desc: str = "") -> dict:
         data_desc: str - 数据描述（可选）
         
     返回：
-        dict - 包含统计结果(result)、执行的代码(code)和结果描述(result_desc)
+        dict - 包含统计结果(result)、执行的代码(code)、原始响应(raw_response)和结果描述(result_desc)
     """
     import pandas as pd
     import io
+    import re
     
     info_buffer = io.StringIO()
     data.info(buf=info_buffer)
@@ -264,7 +268,7 @@ def data_chat(data, user_requirement: str, data_desc: str = "") -> dict:
 5. 只返回代码，不返回其他解释文字
 6. 如果是DataFrame，使用 data 作为变量名；如果是Series，也使用 data 作为变量名
 7. 支持单行或多行代码，多行代码时最后一行必须将结果赋值给变量 `result`
-8. 返回结果应该是统计计算的结果（DataFrame、Series或标量值）
+8. 请保留result本该的数据结构，不要对它reset_index操作
 
 示例（单行）：
 用户需求: 计算各列的均值
@@ -297,15 +301,23 @@ result = np.std(data['value'])
     raw_response = response
     
     code = response.strip()
-    if code.startswith('```python'):
-        code = code[10:]
-    if code.endswith('```'):
-        code = code[:-3]
-    code = code.strip()
+    
+    code = re.sub(r'```(python)?\s*', '', code)
+    
+    code = code.rstrip('`').strip()
+    
+    code = ''.join(char for char in code if char.isprintable() or char == '\n' or char == '\t')
+    
+    if response.startswith("【API调用失败】"):
+        return {
+            'result': None,
+            'code': code,
+            'error': "大模型接口调用失败，请检查配置和网络",
+            'raw_response': raw_response,
+            'result_desc': ""
+        }
     
     try:
-        import pandas as pd
-        
         exec_globals = globals().copy()
         exec_globals['pd'] = pd
         exec_globals['pandas'] = pd
@@ -313,9 +325,20 @@ result = np.std(data['value'])
         local_vars = {'data': data}
         
         if '\n' in code:
+            lines = code.split('\n')
+            lines = [line for line in lines if line.strip() and not line.strip().startswith('#')]
+            if lines and not lines[-1].strip().startswith(('result =', 'return ')):
+                lines.append('result = result' if lines[-1].strip().startswith('result') else f'result = {lines[-1]}')
+            code = '\n'.join(lines)
             exec(code, exec_globals, local_vars)
         else:
-            exec(f"result = {code}", exec_globals, local_vars)
+            if code.strip():
+                if code.strip().startswith('result ='):
+                    exec(code, exec_globals, local_vars)
+                else:
+                    exec(f"result = {code}", exec_globals, local_vars)
+            else:
+                raise ValueError("生成的代码为空")
         
         result = local_vars.get('result')
         
@@ -344,7 +367,10 @@ result = np.std(data['value'])
 3. 简洁明了，不超过100字"""
         
         result_desc = call_openai_api("你是一个数据分析师，请用简洁的语言描述统计结果。", result_desc_prompt, temperature=0.3, max_tokens=200)
-        result_desc = result_desc.strip()
+        if result_desc.startswith("【API调用失败】"):
+            result_desc = "描述生成失败"
+        else:
+            result_desc = result_desc.strip()
         
         return {
             'result': result,
