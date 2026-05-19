@@ -11,9 +11,75 @@ import random
 import os
 import sys
 import sqlite3
+import json as json_module
 from datetime import datetime
 
 import pandas as pd
+import numpy as np
+
+
+def custom_json_serializer(obj):
+    """
+    自定义JSON序列化函数，处理pandas、numpy等非JSON可序列化对象
+
+    参数：
+        obj: object - 要序列化的对象
+
+    返回：
+        JSON可序列化对象
+
+    支持的类型：
+        - bool: 布尔值
+        - pd.Timestamp: pandas时间戳
+        - pd.DatetimeIndex: pandas时间索引
+        - pd.Series: pandas序列
+        - np.number: numpy数值类型
+        - np.ndarray: numpy数组
+        - datetime.datetime: Python日期时间
+        - datetime.date: Python日期
+    """
+    # 处理布尔值（必须在数值类型之前，因为bool是int的子类）
+    if isinstance(obj, bool):
+        return obj
+    # 处理pandas Timestamp对象
+    elif isinstance(obj, pd.Timestamp):
+        if obj.hour == 0 and obj.minute == 0 and obj.second == 0 and obj.nanosecond == 0:
+            return obj.strftime('%Y-%m-%d')
+        else:
+            return obj.strftime('%Y-%m-%d %H:%M:%S')
+    # 处理pandas DatetimeIndex对象
+    elif isinstance(obj, pd.DatetimeIndex):
+        return [custom_json_serializer(x) for x in obj]
+    # 处理pandas Series对象
+    elif isinstance(obj, pd.Series):
+        return obj.to_dict()
+    # 处理数值类型（包括Python内置和numpy数值）
+    elif isinstance(obj, (int, float, np.number)):
+        if isinstance(obj, float) and np.isnan(obj):
+            return 0
+        return float(obj)
+    # 处理numpy数组
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    # 处理datetime对象
+    elif isinstance(obj, datetime):
+        if obj.hour == 0 and obj.minute == 0 and obj.second == 0:
+            return obj.strftime('%Y-%m-%d')
+        else:
+            return obj.strftime('%Y-%m-%d %H:%M:%S')
+    # 处理date对象
+    elif isinstance(obj, datetime.date):
+        return obj.strftime('%Y-%m-%d')
+    # 处理其他类型
+    else:
+        try:
+            json_module.dumps(obj)
+            return obj
+        except:
+            try:
+                return str(obj)
+            except:
+                return ""
 
 
 # 向后兼容导入 - 从 chartsdb 模块导入
@@ -21,9 +87,11 @@ try:
     from .chartsdb.utils import init_pancharts_db, open_db_manager
 except ImportError:
     def init_pancharts_db(directory: str = None) -> str:
+        """初始化Pancharts数据库（兼容旧版本导入）"""
         raise ImportError("chartsdb模块未找到，请确保chartsdb目录存在")
     
     def open_db_manager(host: str = "0.0.0.0", port: int = 8000):
+        """打开数据库管理页面（兼容旧版本导入）"""
         raise ImportError("chartsdb模块未找到，请确保chartsdb目录存在")
 
 
@@ -108,6 +176,472 @@ def get_value_type(x):
     if isinstance(dtype, pd.CategoricalDtype):
         return 'category'
     return 'value'
+
+def get_chart(record_id: int, db_path: str = None) -> dict:
+    """
+    根据图表记录ID获取图表的各项数据，其中Option配置项已转换为Python字典
+    
+    参数：
+        record_id: int - 图表记录的ID
+        db_path: str - 数据库文件路径，可选。如果不指定，将从配置文件读取或使用默认路径
+        
+    返回：
+        dict - 包含图表各项数据的字典，结构如下：
+            {
+                'id': int - 记录ID,
+                'insert_time': str - 插入时间,
+                'option': dict - 图表配置（已转换为Python字典）,
+                'data_option': dict - 数据配置项（已转换为Python字典）,
+                'file_path': str - 创建记录时的文件路径,
+                'tag0': str - 自定义标签0,
+                'tag1': str - 自定义标签1,
+                'data_desc': str - 数据描述,
+                'data_insight': str - 数据洞察
+            }
+            如果查询失败或记录不存在，返回空字典{}
+    """
+    # 获取数据库路径
+    if not db_path:
+        try:
+            from pancharts.chart_config import SQLITE_DB_PATH
+            if SQLITE_DB_PATH and SQLITE_DB_PATH.strip():
+                db_path = SQLITE_DB_PATH
+            else:
+                db_path = os.path.join(os.getcwd(), "pancharts_option.db")
+        except ImportError:
+            db_path = os.path.join(os.getcwd(), "pancharts_option.db")
+    
+    try:
+        # 连接数据库
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        # 查询记录
+        cursor.execute('''
+            SELECT id, insert_time, option, data_option, file_path, 
+                   tag0, tag1, data_desc, data_insight 
+            FROM pancharts_options 
+            WHERE id = ?
+        ''', (record_id,))
+        
+        row = cursor.fetchone()
+        
+        if row:
+            # 将JSON字符串转换为Python字典
+            try:
+                option_dict = json_module.loads(row[2]) if row[2] else {}
+            except (json_module.JSONDecodeError, TypeError):
+                option_dict = {}
+            
+            try:
+                data_option_dict = json_module.loads(row[3]) if row[3] else {}
+            except (json_module.JSONDecodeError, TypeError):
+                data_option_dict = {}
+            
+            result = {
+                'id': row[0],
+                'insert_time': row[1],
+                'option': option_dict,
+                'data_option': data_option_dict,
+                'file_path': row[4],
+                'tag0': row[5],
+                'tag1': row[6],
+                'data_desc': row[7],
+                'data_insight': row[8]
+            }
+        else:
+            result = {}
+        
+        # 关闭连接
+        conn.close()
+        
+        return result
+        
+    except Exception as e:
+        print(f"查询图表数据失败: {str(e)}")
+        return {}
+
+
+def charts_md(id_list: list = None, tag0: str = None, tag1: str = None, path: str = None, db_path: str = None, output_file: str = "charts_report.md") -> str:
+    """
+    根据条件从数据库查询图表数据，生成Markdown报告文件
+    
+    参数：
+        id_list: list - 图表ID列表，由整数构成
+        tag0: str - 按tag0筛选
+        tag1: str - 按tag1筛选
+        path: str - 按文件路径筛选
+        db_path: str - 数据库文件路径，可选
+        output_file: str - 输出的Markdown文件名，默认"charts_report.md"
+        
+    返回：
+        str - 输出文件的完整路径，如果失败返回空字符串
+    """
+    # 获取数据库路径
+    if not db_path:
+        try:
+            from pancharts.chart_config import SQLITE_DB_PATH
+            if SQLITE_DB_PATH and SQLITE_DB_PATH.strip():
+                db_path = SQLITE_DB_PATH
+            else:
+                db_path = os.path.join(os.getcwd(), "pancharts_option.db")
+        except ImportError:
+            db_path = os.path.join(os.getcwd(), "pancharts_option.db")
+    
+    # 构建查询条件
+    conditions = []
+    params = []
+    
+    if id_list and isinstance(id_list, list) and len(id_list) > 0:
+        placeholders = ','.join('?' * len(id_list))
+        conditions.append(f'id IN ({placeholders})')
+        params.extend(id_list)
+    
+    if tag0 and tag0.strip():
+        conditions.append('tag0 = ?')
+        params.append(tag0.strip())
+    
+    if tag1 and tag1.strip():
+        conditions.append('tag1 = ?')
+        params.append(tag1.strip())
+    
+    if path and path.strip():
+        conditions.append('file_path = ?')
+        params.append(path.strip())
+    
+    if not conditions:
+        print("请至少提供一个筛选条件")
+        return ""
+    
+    try:
+        # 连接数据库
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        # 构建查询语句
+        where_clause = ' AND '.join(conditions)
+        query = f'''
+            SELECT id, insert_time, option, data_option, file_path, 
+                   tag0, tag1, data_desc, data_insight 
+            FROM pancharts_options 
+            WHERE {where_clause}
+            ORDER BY id
+        '''
+        
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        conn.close()
+        
+        if not rows:
+            print("未找到符合条件的图表记录")
+            return ""
+        
+        # 收集所有图表数据
+        charts_data = []
+        all_dependencies = set()
+        
+        from pancharts.core import Pancharts
+        
+        for row in rows:
+            record_id = row[0]
+            insert_time = row[1]
+            option_json = row[2]
+            data_option_json = row[3]
+            file_path = row[4]
+            tag0_val = row[5]
+            tag1_val = row[6]
+            data_desc = row[7]
+            data_insight = row[8]
+            
+            # 解析JSON
+            try:
+                option_dict = json_module.loads(option_json) if option_json else {}
+            except:
+                option_dict = {}
+            
+            try:
+                data_option_dict = json_module.loads(data_option_json) if data_option_json else {}
+            except:
+                data_option_dict = {}
+            
+            # 创建Pancharts实例并准备渲染数据
+            chart = Pancharts(user_option=option_dict, data_config=data_option_dict)
+            render_data = chart.prepare_render_data()
+            
+            rendered_option = render_data.get('rendered_option', '')
+            
+            # 如果rendered_option是空字符串或空对象，使用原始option
+            if not rendered_option or rendered_option == '{}':
+                rendered_option = json_module.dumps(option_dict, ensure_ascii=False, indent=2)
+            
+            # 收集依赖
+            deps = []
+            if render_data.get('use_echarts_gl'):
+                deps.append(render_data.get('echarts_gl_js_path', ''))
+            if render_data.get('use_echarts_wordcloud'):
+                deps.append(render_data.get('echarts_wordcloud_js_path', ''))
+            if render_data.get('map_url'):
+                deps.append(render_data.get('map_url'))
+            if render_data.get('is_amap_chart'):
+                deps.append(render_data.get('amap_js_path', ''))
+                deps.append(render_data.get('amap_map_js_path', ''))
+            
+            for dep in deps:
+                if dep:
+                    all_dependencies.add(dep)
+            
+            charts_data.append({
+                'id': record_id,
+                'insert_time': insert_time,
+                'rendered_option': rendered_option,
+                'data_desc': data_desc,
+                'data_insight': data_insight,
+                'tag0': tag0_val,
+                'tag1': tag1_val,
+                'file_path': file_path
+            })
+        
+        # 生成Markdown内容
+        md_content = []
+        
+        # 添加依赖部分
+        md_content.append("# 图表报告")
+        md_content.append("")
+        md_content.append("## 引用依赖")
+        md_content.append("")
+        for dep in sorted(all_dependencies):
+            md_content.append(f"- {dep}")
+        md_content.append("")
+        
+        # 添加图表部分
+        md_content.append("## 图表列表")
+        md_content.append("")
+        
+        for idx, chart_data in enumerate(charts_data, 1):
+            md_content.append(f"---")
+            md_content.append(f"")
+            md_content.append(f"### 图表 {idx} (ID: {chart_data['id']})")
+            md_content.append(f"")
+            
+            # 基本信息
+            if chart_data['tag0']:
+                md_content.append(f"- **标签0**: {chart_data['tag0']}")
+            if chart_data['tag1']:
+                md_content.append(f"- **标签1**: {chart_data['tag1']}")
+            if chart_data['file_path']:
+                md_content.append(f"- **文件路径**: {chart_data['file_path']}")
+            if chart_data['insert_time']:
+                md_content.append(f"- **插入时间**: {chart_data['insert_time']}")
+            md_content.append(f"")
+            
+            # 数据描述
+            md_content.append(f"#### 数据描述")
+            md_content.append(f"{chart_data['data_desc'] or '无'}")
+            md_content.append(f"")
+            
+            # 数据洞察
+            md_content.append(f"#### 数据洞察")
+            md_content.append(f"{chart_data['data_insight'] or '无'}")
+            md_content.append(f"")
+            
+            # Rendered Option
+            md_content.append(f"#### 渲染配置 (rendered_option)")
+            md_content.append(f"```json")
+            md_content.append(chart_data['rendered_option'])
+            md_content.append(f"```")
+            md_content.append(f"")
+        
+        # 写入文件
+        output_path = os.path.join(os.getcwd(), output_file)
+        with open(output_path, 'w', encoding='utf-8') as f:
+            f.write('\n'.join(md_content))
+        
+        print(f"Markdown报告已生成: {output_path}")
+        return output_path
+        
+    except Exception as e:
+        print(f"生成图表报告失败: {str(e)}")
+        return ""
+
+
+def get_data(identifier, db_path: str = None) -> dict:
+    """
+    根据ID或file_path从data_desc表读取数据记录，并加载对应的数据文件
+    
+    参数：
+        identifier: int or str - 如果是整数，作为data_desc表的id查询；
+                               如果是字符串，作为file_path查询
+        db_path: str - 数据库文件路径，可选
+    
+    返回：
+        dict - 包含以下键的字典：
+            'data': DataFrame - 读取的数据框
+            'desc': str - 数据描述
+            'data_info': str - data.info()的输出内容
+            'file_path': str - 文件路径
+            'read_config': dict - 使用的读取配置
+    """
+    # 获取数据库路径
+    if not db_path:
+        try:
+            from pancharts.chart_config import SQLITE_DB_PATH
+            if SQLITE_DB_PATH and SQLITE_DB_PATH.strip():
+                db_path = SQLITE_DB_PATH
+            else:
+                db_path = os.path.join(os.getcwd(), "pancharts_option.db")
+        except ImportError:
+            db_path = os.path.join(os.getcwd(), "pancharts_option.db")
+    
+    try:
+        # 连接数据库
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        # 根据参数类型构建查询
+        if isinstance(identifier, int):
+            query = 'SELECT file_path, file_suffix, read_config, desc FROM data_desc WHERE id = ?'
+            params = (identifier,)
+        elif isinstance(identifier, str):
+            query = 'SELECT file_path, file_suffix, read_config, desc FROM data_desc WHERE file_path = ?'
+            params = (identifier,)
+        else:
+            print("参数类型错误，必须是整数或字符串")
+            return {}
+        
+        cursor.execute(query, params)
+        row = cursor.fetchone()
+        conn.close()
+        
+        if not row:
+            print(f"未找到匹配的记录: {identifier}")
+            return {}
+        
+        file_path, file_suffix, read_config_pickle, desc = row
+        
+        # 反序列化read_config
+        import pickle
+        try:
+            read_config = pickle.loads(read_config_pickle)
+        except Exception as e:
+            read_config = {}
+        
+        # 检查文件是否存在
+        if not os.path.exists(file_path):
+            print(f"文件不存在: {file_path}")
+            return {}
+        
+        # 解析read_config，提取实际的读取参数
+        # read_func是函数类型标识，不是读取参数，需要去掉
+        read_func = read_config.get('read_func', 'csv')
+        
+        # 准备传递给读取函数的参数（参考app.py中的处理方式）
+        read_params = {}
+        
+        # 处理 sep 参数
+        if read_config.get('sep'):
+            if read_config['sep'] == '\\t':
+                read_params['sep'] = '\t'
+            else:
+                read_params['sep'] = read_config['sep']
+        
+        # 处理 encoding 参数
+        if read_config.get('encoding'):
+            read_params['encoding'] = read_config['encoding']
+        
+        # 处理 header 参数
+        if read_config.get('header') is not None:
+            header_val = read_config['header']
+            if header_val == '-1':
+                read_params['header'] = None
+            else:
+                read_params['header'] = int(header_val)
+        
+        # 处理 names 参数
+        if read_config.get('names'):
+            names_list = [n.strip() for n in read_config['names'].split('\n') if n.strip()]
+            if names_list:
+                read_params['names'] = names_list
+        
+        # 处理 nrows 参数
+        if read_config.get('nrows'):
+            read_params['nrows'] = int(read_config['nrows'])
+        
+        # 处理 skiprows 参数
+        if read_config.get('skiprows'):
+            read_params['skiprows'] = int(read_config['skiprows'])
+        
+        # 处理 skipfooter 参数
+        if read_config.get('skipfooter'):
+            read_params['skipfooter'] = int(read_config['skipfooter'])
+        
+        # 处理 usecols 参数
+        if read_config.get('usecols'):
+            read_params['usecols'] = read_config['usecols']
+        
+        # 处理 index_col 参数
+        if read_config.get('index_col'):
+            read_params['index_col'] = int(read_config['index_col'])
+        
+        # 处理 parse_dates 参数
+        if read_config.get('parse_dates'):
+            read_params['parse_dates'] = read_config['parse_dates']
+        
+        # 处理 na_values 参数
+        if read_config.get('na_values'):
+            read_params['na_values'] = read_config['na_values']
+        
+        # 处理 skip_blank_lines 参数
+        if 'skip_blank_lines' in read_config:
+            read_params['skip_blank_lines'] = read_config['skip_blank_lines']
+        
+
+        
+        # 根据read_func或文件后缀选择读取函数
+        import pandas as pd
+        
+        try:
+            if read_func == 'csv' or file_suffix.lower() == 'csv':
+                df = pd.read_csv(file_path, **read_params)
+            elif read_func == 'excel' or file_suffix.lower() in ('xlsx', 'xls'):
+                df = pd.read_excel(file_path, **read_params)
+            else:
+                print(f"不支持的文件格式: {file_suffix} (read_func: {read_func})")
+                return {}
+        except Exception as e:
+            print(f"读取文件失败: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return {}
+        
+        # 获取data.info()的输出
+        import io
+        buffer = io.StringIO()
+        df.info(buf=buffer)
+        data_info = buffer.getvalue()
+        
+        # 输出信息
+        print("=" * 60)
+        print(f"数据描述 (desc):")
+        print(desc or "无描述")
+        print("\n" + "=" * 60)
+        print(f"数据信息 (data.info()):")
+        print(data_info)
+        print("=" * 60)
+        
+        return {
+            'data': df,
+            'desc': desc,
+            'data_info': data_info,
+            'file_path': file_path,
+            'read_config': read_config
+        }
+        
+    except Exception as e:
+        print(f"获取数据失败: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return {}
+
 
 def deep_merge(dict1, dict2):
     """
