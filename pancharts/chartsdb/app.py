@@ -8,16 +8,18 @@ Pancharts数据管理API服务
 
 import os
 import sys
+import sqlite3
+import json
+from datetime import datetime
+
+import pandas as pd
+import numpy as np
 
 # 优先从 site-packages 导入 fastapi，避免本地文件名冲突
 import importlib.util
 spec = importlib.util.find_spec('fastapi')
 if spec and 'site-packages' in spec.origin:
     sys.path.insert(0, os.path.dirname(spec.origin))
-
-import sqlite3
-import json
-from datetime import datetime
 
 from fastapi import FastAPI, Request, Form, Depends, File, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
@@ -28,12 +30,12 @@ try:
     from ..chart_config import SQLITE_DB_PATH
     from .utils import init_pancharts_db
     from ..core import Pancharts
-    from ..agent import desc_chat
+    from ..agent import desc_chat, data_chat
 except ImportError:
     from pancharts.chart_config import SQLITE_DB_PATH
     from pancharts.chartsdb.utils import init_pancharts_db
     from pancharts.core import Pancharts
-    from pancharts.agent import desc_chat
+    from pancharts.agent import desc_chat, data_chat
 
 app = FastAPI(title="Pancharts数据管理", description="管理pancharts_option数据库")
 
@@ -110,25 +112,29 @@ async def batch_preview(request: Request, ids: str = ""):
         try:
             option_data = json.loads(record["option"])
             
+            # 从数据库记录中读取 data_desc 和 data_insight（而不是从 option 中）
+            data_desc = record["data_desc"] if record["data_desc"] is not None else ""
+            data_insight = record["data_insight"] if record["data_insight"] is not None else ""
+            
+            # 使用 render_emb 生成完整图表HTML（支持3D图表）
+            chart = Pancharts()
+            chart.option = option_data
+            emb_result = chart.render_emb()
+            chart_html = emb_result["html"]
+            for js_url in emb_result.get("js_dependencies", []):
+                js_dependencies.add(js_url)
+            
             chart_info = {
                 "id": record["id"],
                 "tag0": record["tag0"],
                 "tag1": record["tag1"],
                 "insert_time": record["insert_time"],
                 "random_id": f"batch_{record['id']}",
-                "theme": option_data.get("init", {}).get("theme", ""),
-                "renderer": option_data.get("init", {}).get("renderer", "canvas"),
-                "desc": option_data.get("desc", ""),
-                "is_amap_chart": "amap" in option_data,
-                "option": json.dumps({k: v for k, v in option_data.items() if k != "init" and k != "desc"})
+                "desc": data_desc,
+                "insight": data_insight,
+                "chart_html": chart_html
             }
             charts.append(chart_info)
-            
-            chart = Pancharts()
-            chart.option = option_data
-            emb_result = chart.render_emb()
-            for js_url in emb_result.get("js_dependencies", []):
-                js_dependencies.add(js_url)
                 
         except Exception as e:
             print(f"Error processing chart {record['id']}: {e}")
@@ -513,69 +519,28 @@ async def stats_data_api(request: Request):
                 "raw_response": raw_response
             })
         
-        def replace_nan(value):
-            if isinstance(value, float) and np.isnan(value):
-                return None
-            if isinstance(value, list):
-                return [replace_nan(v) for v in value]
-            if isinstance(value, dict):
-                return {k: replace_nan(v) for k, v in value.items()}
-            return value
+        data_type = 'dataframe'
         
-        index_info = None
-        
-        if isinstance(stats_result, pd.DataFrame):
-            result_data = stats_result.replace({np.nan: None}).to_dict('records')
-            row_count = len(result_data)
-            col_count = len(result_data[0]) if result_data else 0
-            data_type = 'dataframe'
-            index_info = {
-                'has_index': not stats_result.index.equals(pd.RangeIndex(len(stats_result))),
-                'index_name': stats_result.index.name,
-                'index_values': stats_result.index.tolist(),
-                'columns': stats_result.columns.tolist(),
-                'is_multi_index': isinstance(stats_result.index, pd.MultiIndex),
-                'index_levels': stats_result.index.nlevels if isinstance(stats_result.index, pd.MultiIndex) else 1,
-                'index_names': list(stats_result.index.names) if isinstance(stats_result.index, pd.MultiIndex) else [stats_result.index.name]
-            }
-        elif isinstance(stats_result, pd.Series):
-            index_data = stats_result.index.tolist()
-            if isinstance(stats_result.index, pd.MultiIndex):
-                index_data = [list(idx) for idx in stats_result.index]
-            
-            result_data = {
-                'index': index_data,
-                'values': replace_nan(stats_result.values.tolist()),
-                'name': stats_result.name,
-                'is_multi_index': isinstance(stats_result.index, pd.MultiIndex),
-                'index_names': list(stats_result.index.names) if isinstance(stats_result.index, pd.MultiIndex) else None
-            }
-            row_count = len(stats_result)
-            col_count = 1
+        if isinstance(stats_result, pd.Series):
+            df_result = stats_result.to_frame()
             data_type = 'series'
-            # 为Series也添加index_info
-            index_info = {
-                'has_index': not stats_result.index.equals(pd.RangeIndex(len(stats_result))),
-                'index_name': stats_result.index.name,
-                'index_values': stats_result.index.tolist(),
-                'is_multi_index': isinstance(stats_result.index, pd.MultiIndex),
-                'index_levels': stats_result.index.nlevels if isinstance(stats_result.index, pd.MultiIndex) else 1,
-                'index_names': list(stats_result.index.names) if isinstance(stats_result.index, pd.MultiIndex) else [stats_result.index.name],
-                'series_name': stats_result.name
-            }
+        elif isinstance(stats_result, pd.DataFrame):
+            df_result = stats_result
         else:
-            result_data = [{"result": str(stats_result)}]
-            row_count = 1
-            col_count = 1
+            df_result = pd.DataFrame([{"result": str(stats_result)}])
             data_type = 'other'
-            index_info = None
+        
+        # 统计结果执行reset_index()统一格式
+        df_reset = df_result.reset_index()
+        result_data = df_reset.replace({np.nan: None, float('nan'): None}).to_dict('records')
+        index_info = get_index_info(df_result)
         
         return JSONResponse(content={
             "success": True,
             "code": str(result.get('code', '')),
             "result": result_data,
-            "row_count": row_count,
-            "col_count": col_count,
+            "row_count": len(df_result),
+            "col_count": len(df_result.columns),
             "data_type": data_type,
             "raw_response": raw_response,
             "result_desc": result.get('result_desc', ''),
@@ -740,6 +705,36 @@ async def stats_data_full_api(
         return JSONResponse(content={"success": False, "error": f"统计分析失败: {str(e)}", "raw_response": ""})
 
 
+def get_index_info(df):
+    """
+    获取数据的索引信息
+    
+    参数：
+        df: pd.DataFrame - 输入的数据框
+    
+    返回：
+        dict - 索引信息
+    """
+    has_index = not df.index.equals(pd.RangeIndex(len(df)))
+    original_index_columns = []
+    if has_index:
+        if isinstance(df.index, pd.MultiIndex):
+            original_index_columns = [name for name in df.index.names if name is not None]
+        elif df.index.name is not None:
+            original_index_columns = [df.index.name]
+    
+    return {
+        'has_index': has_index,
+        'index_name': df.index.name,
+        'index_values': df.index.tolist(),
+        'columns': df.columns.tolist(),
+        'is_multi_index': isinstance(df.index, pd.MultiIndex),
+        'index_levels': df.index.nlevels if isinstance(df.index, pd.MultiIndex) else 1,
+        'index_names': list(df.index.names) if isinstance(df.index, pd.MultiIndex) else [df.index.name],
+        'original_index_columns': original_index_columns
+    }
+
+
 @app.post("/api/read-data")
 async def read_data_api(
     file: UploadFile = File(...),
@@ -760,6 +755,7 @@ async def read_data_api(
     """API接口 - 读取数据文件，支持pandas read_csv/read_excel常用参数"""
     try:
         import pandas as pd
+        import numpy as np
         import io
         
         content = await file.read()
@@ -830,20 +826,22 @@ async def read_data_api(
         else:
             df = pd.read_csv(io.StringIO(content.decode(encoding)), **read_kwargs)
         
-        preview_data = df.head(10).replace({float('nan'): None, 'nan': None}).to_dict('records')
+        result_data = df.replace({np.nan: None, float('nan'): None}).to_dict('records')
+        index_info = get_index_info(df)
         
-        import json
         return JSONResponse(content={
             "success": True,
-            "data": preview_data,
+            "data": result_data,
             "row_count": len(df),
             "col_count": len(df.columns),
+            "data_type": "dataframe",
+            "index_info": index_info,
             "filename": filename,
             "server_path": server_path
         })
         
     except Exception as e:
-        return {"success": False, "error": f"读取文件失败: {str(e)}"}
+        return JSONResponse(content={"success": False, "error": f"读取文件失败: {str(e)}"})
 
 
 @app.get("/visualization", response_class=HTMLResponse)
@@ -869,6 +867,13 @@ async def get_data_info_api(request: Request):
         if not raw_data:
             return JSONResponse(content={"success": False, "error": "数据为空"})
         
+        # 检查数据是否已经包含了索引列（统计结果有，数据读取没有）
+        has_index_columns_in_data = False
+        if index_info and index_info.get('has_index') and index_info.get('original_index_columns'):
+            df_check = pd.DataFrame(raw_data)
+            original_index_columns = index_info.get('original_index_columns', [])
+            has_index_columns_in_data = len(original_index_columns) > 0 and all(col in df_check.columns for col in original_index_columns)
+        
         if data_type == 'series':
             if isinstance(raw_data, dict) and 'values' in raw_data and 'index' in raw_data:
                 if raw_data.get('is_multi_index') and raw_data.get('index_names'):
@@ -879,13 +884,22 @@ async def get_data_info_api(request: Request):
             else:
                 df = pd.DataFrame(raw_data)
                 if len(df.columns) >= 2:
-                    # 检查是否有索引信息
-                    if index_info and index_info.get('is_multi_index') and index_info.get('index_levels') and index_info.get('index_levels') > 1:
+                    if has_index_columns_in_data:
+                        # 数据中已经包含索引列
+                        if index_info and index_info.get('is_multi_index'):
+                            # 多重索引
+                            df.set_index(index_info.get('original_index_columns'), inplace=True)
+                            vis_data = df.iloc[:, 0]
+                        else:
+                            # 单重索引
+                            df.set_index(index_info.get('original_index_columns'), inplace=True)
+                            vis_data = df.iloc[:, 0]
+                    elif index_info and index_info.get('is_multi_index') and index_info.get('index_levels') and index_info.get('index_levels') > 1:
                         # 使用index_info中的索引信息
                         index_tuples = [tuple(idx) for idx in index_info.get('index_values')]
                         vis_data = pd.Series(df.iloc[:, -1].values, index=pd.MultiIndex.from_tuples(index_tuples, names=index_info.get('index_names')), name=df.columns[-1])
                     else:
-                        # 对于普通情况，使用前两列
+                        # 对于普通情况
                         vis_data = pd.Series(df.iloc[:, 1].values, index=df.iloc[:, 0], name=df.columns[1])
                 elif len(df.columns) == 1:
                     vis_data = pd.Series(df.iloc[:, 0].values, name=df.columns[0])
@@ -894,8 +908,16 @@ async def get_data_info_api(request: Request):
             df = vis_data.to_frame()
         else:
             df = pd.DataFrame(raw_data)
-            if index_info and index_info.get('has_index') and index_info.get('index_values'):
-                df.index = pd.Index(index_info.get('index_values'), name=index_info.get('index_name'))
+            if has_index_columns_in_data and index_info and index_info.get('original_index_columns'):
+                # 数据中已经包含索引列，直接设置
+                df.set_index(index_info.get('original_index_columns'), inplace=True)
+            elif index_info and index_info.get('has_index') and index_info.get('index_values'):
+                # 数据中没有索引列，从index_info设置
+                if index_info.get('is_multi_index') and index_info.get('index_names'):
+                    index_tuples = [tuple(idx) for idx in index_info.get('index_values')]
+                    df.index = pd.MultiIndex.from_tuples(index_tuples, names=index_info.get('index_names'))
+                else:
+                    df.index = pd.Index(index_info.get('index_values'), name=index_info.get('index_name'))
         
         buffer = io.StringIO()
         df.info(buf=buffer)
@@ -948,23 +970,33 @@ async def create_visualization_api(request: Request):
             return JSONResponse(content={"success": False, "error": f"未知的可视化类: {vis_class}"})
         
         index_info = data.get("index_info", None)
+        drop_columns = data.get("drop_columns", [])
         
         # 数据重构步骤
         # 创建DataFrame
         df = pd.DataFrame(raw_data)
         
+        # 删除选择的列
+        if drop_columns and len(drop_columns) > 0:
+            df = df.drop(columns=[col for col in drop_columns if col in df.columns])
+        
+        # 检查数据是否已经包含了索引列（统计结果有，数据读取没有）
+        has_index_columns_in_data = False
+        if index_info and index_info.get('has_index') and index_info.get('original_index_columns'):
+            original_index_columns = index_info.get('original_index_columns', [])
+            has_index_columns_in_data = len(original_index_columns) > 0 and all(col in df.columns for col in original_index_columns)
+        
         # 设置索引
         if index_columns:
-            # 检查索引列是否存在
+            # 检查索引列是否存在于数据中
             missing_columns = []
             for col in index_columns:
                 if col not in df.columns:
                     missing_columns.append(col)
             
             if missing_columns:
-                # 检查是否这些列是索引列
+                # 索引列不在数据中，需要从index_info获取
                 if index_info and index_info.get('has_index'):
-                    # 如果index_info中包含这些列作为索引，直接使用index_info中的索引
                     if index_info.get('is_multi_index') and index_info.get('index_names'):
                         # 多重索引
                         index_tuples = [tuple(idx) for idx in index_info.get('index_values')]
@@ -975,7 +1007,7 @@ async def create_visualization_api(request: Request):
                 else:
                     return JSONResponse(content={"success": False, "error": f"索引列 '{missing_columns[0]}' 不存在"})
             else:
-                # 所有索引列都存在，直接设置
+                # 所有索引列都存在于数据中，直接设置
                 df.set_index(index_columns, inplace=True)
         
         # 根据重构类型处理
@@ -1263,6 +1295,7 @@ async def get_data_desc_api(record_id: int):
 async def read_data_by_path_api(request: Request):
     """API接口 - 通过文件路径直接读取数据"""
     import pandas as pd
+    import numpy as np
     import io
     
     try:
@@ -1317,16 +1350,16 @@ async def read_data_by_path_api(request: Request):
         else:
             df = pd.read_csv(file_path, **read_kwargs)
         
-        row_count = df.shape[0]
-        col_count = df.shape[1]
-        
-        data_list = df.replace({float('nan'): None, 'nan': None}).to_dict(orient='records')
+        result_data = df.replace({np.nan: None, float('nan'): None}).to_dict('records')
+        index_info = get_index_info(df)
         
         return JSONResponse(content={
             "success": True,
-            "data": data_list,
-            "row_count": row_count,
-            "col_count": col_count,
+            "data": result_data,
+            "row_count": len(df),
+            "col_count": len(df.columns),
+            "data_type": "dataframe",
+            "index_info": index_info,
             "file_name": os.path.basename(file_path)
         })
         
