@@ -97,12 +97,22 @@
             font-size: 14px;
             line-height: 1.6;
             color: #333;
+            margin-bottom: 15px;
+        }
+        .pancharts-desc:last-child {
+            margin-bottom: 0;
         }
         .pancharts-desc-title {
             font-weight: bold;
             font-size: 16px;
             margin-bottom: 10px;
             color: #1890ff;
+        }
+        .pancharts-insight-title {
+            font-weight: bold;
+            font-size: 16px;
+            margin-bottom: 10px;
+            color: #52c41a;
         }
         .no-charts {
             text-align: center;
@@ -151,23 +161,24 @@
                 </div>
             </div>
             <div class="pancharts-container">
-                <div id="chart-{{ chart.random_id }}" class="pancharts-chart"></div>
-                {% if chart.desc %}
-                <div class="pancharts-desc">
-                    <div class="pancharts-desc-title">图表说明</div>
-                    {{ chart.desc }}
+                <div class="pancharts-chart" style="width: 100%; height: 400px;">
+                    {{ chart.chart_html | safe }}
                 </div>
-                {% endif %}
+                <div>
+                    {% if chart.desc %}
+                    <div class="pancharts-desc" style="border-left-color: #1890ff;">
+                        <div class="pancharts-desc-title">数据描述</div>
+                        {{ chart.desc }}
+                    </div>
+                    {% endif %}
+                    {% if chart.insight %}
+                    <div class="pancharts-desc" style="border-left-color: #52c41a;">
+                        <div class="pancharts-insight-title">数据洞察</div>
+                        {{ chart.insight }}
+                    </div>
+                    {% endif %}
+                </div>
             </div>
-            <script type="application/json" id="chart-config-{{ chart.random_id }}">
-            {
-                "random_id": "{{ chart.random_id }}",
-                "theme": "{{ chart.theme }}",
-                "renderer": "{{ chart.renderer }}",
-                "option": {{ chart.option|safe }},
-                "is_amap_chart": {% if chart.is_amap_chart %}true{% else %}false{% endif %}
-            }
-            </script>
         </div>
         {% endfor %}
     {% else %}
@@ -188,50 +199,6 @@
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
-        });
-        
-        function initChart(configId, chartId) {
-            var configEl = document.getElementById(configId);
-            var chartDom = document.getElementById(chartId);
-            
-            if (!configEl || !chartDom) {
-                console.warn('Chart config or container not found:', chartId);
-                return;
-            }
-            
-            if (chartDom._pancharts_initialized) return;
-            chartDom._pancharts_initialized = true;
-            
-            if (typeof echarts === 'undefined') {
-                console.warn('ECharts not found, cannot initialize chart:', chartId);
-                return;
-            }
-            
-            try {
-                var config = JSON.parse(configEl.textContent);
-                var chart = echarts.init(chartDom, config.theme, { renderer: config.renderer });
-                chart.setOption(config.option);
-                
-                var resizeHandler = function() {
-                    chart.resize();
-                };
-                window.addEventListener('resize', resizeHandler);
-                
-                chartDom._pancharts_chart = chart;
-                chartDom._pancharts_resizeHandler = resizeHandler;
-                
-            } catch (e) {
-                console.error('Failed to initialize chart:', chartId, e);
-            }
-        }
-        
-        document.addEventListener('DOMContentLoaded', function() {
-            var configElements = document.querySelectorAll('script[type="application/json"]');
-            configElements.forEach(function(el) {
-                var configId = el.id;
-                var chartId = configId.replace('chart-config-', 'chart-');
-                initChart(configId, chartId);
-            });
         });
     </script>
 </body>
