@@ -526,8 +526,24 @@ class Pancharts:
             import sqlite3
             import json
             import sys
+            import numpy as np
             
             from .chart_config import SQLITE_DB_PATH
+            
+            def convert_numpy_types(obj):
+                """递归转换numpy类型为Python原生类型"""
+                if isinstance(obj, np.integer):
+                    return int(obj)
+                elif isinstance(obj, np.floating):
+                    return float(obj)
+                elif isinstance(obj, np.ndarray):
+                    return obj.tolist()
+                elif isinstance(obj, dict):
+                    return {k: convert_numpy_types(v) for k, v in obj.items()}
+                elif isinstance(obj, (list, tuple)):
+                    return [convert_numpy_types(item) for item in obj]
+                else:
+                    return obj
             
             # 检查 SQLITE_DB_PATH 是否配置
             if not SQLITE_DB_PATH:
@@ -558,9 +574,11 @@ class Pancharts:
             if not file_path or os.path.isdir(file_path):
                 file_path = os.getcwd()
             
-            # 获取 option 和 data_config
-            option_json = json.dumps(self.option, ensure_ascii=False, indent=2)
-            data_config_json = json.dumps(self.data_config, ensure_ascii=False, indent=2)
+            # 获取 option 和 data_config，并转换numpy类型
+            option_converted = convert_numpy_types(self.option)
+            data_config_converted = convert_numpy_types(self.data_config)
+            option_json = json.dumps(option_converted, ensure_ascii=False, indent=2)
+            data_config_json = json.dumps(data_config_converted, ensure_ascii=False, indent=2)
             
             # 获取当前时间
             from datetime import datetime
