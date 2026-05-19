@@ -659,7 +659,9 @@
                 .then(response => response.json())
                 .then(result => {
                     if (result.success) {
-                        addDataCard(result.file_name, result.data, result.row_count, result.col_count, false, 'dataframe', fileData.desc || '(导入数据)');
+                        const dataType = result.data_type || 'dataframe';
+                        const indexInfo = result.index_info || null;
+                        addDataCard(result.file_name, result.data, result.row_count, result.col_count, false, dataType, fileData.desc || '(导入数据)', indexInfo);
                         resolve(result);
                     } else {
                         alert(`读取文件 ${fileName} 失败: ${result.error}`);
@@ -716,7 +718,9 @@
                 .then(result => {
                     if (result.success) {
                         const dataDesc = document.getElementById('data_desc').value;
-                        addDataCard(fileName, result.data, result.row_count, result.col_count, false, 'dataframe', dataDesc || '(导入数据)');
+                        const dataType = result.data_type || 'dataframe';
+                        const indexInfo = result.index_info || null;
+                        addDataCard(fileName, result.data, result.row_count, result.col_count, false, dataType, dataDesc || '(导入数据)', indexInfo);
                         
                         const fileSuffix = fileName.split('.').pop().toLowerCase();
                         const fullFilePath = result.server_path || file.path || fileName;
@@ -764,11 +768,11 @@
                 card.className = 'data-card';
                 card.id = cardId;
                 card.setAttribute('data-filename', fileName);
-                card.setAttribute('data-show-all', isStatsResult ? 'true' : 'false');
+                card.setAttribute('data-show-all', 'false');
                 card.setAttribute('data-card-id', cardId);
                 
-                const previewNote = isStatsResult ? `显示全部 ${data.length} 行数据` : `显示前 ${Math.min(10, data.length)} 行数据 | 共 ${rowCount} 行 ${colCount} 列`;
-                const toggleBtnText = isStatsResult ? '显示部分' : '显示全部';
+                const previewNote = `显示前 ${Math.min(10, data.length)} 行数据 | 共 ${rowCount} 行 ${colCount} 列`;
+                const toggleBtnText = '显示全部';
                 const descText = desc || (isStatsResult ? '(统计结果)' : '(导入数据)');
                 
                 card.innerHTML = `
@@ -806,7 +810,7 @@
                     dataListContainer.appendChild(card);
                 }
                 
-                renderTable(data, `${cardId}-table`, isStatsResult, indexInfo);
+                renderTable(data, `${cardId}-table`, false, indexInfo);
                 
                 dataList.push({
                     id: cardId,
@@ -878,9 +882,38 @@
             }
             
             const headers = Object.keys(data[0]);
-            const displayHeaders = indexInfo && indexInfo.has_index && indexInfo.index_name 
-                ? [indexInfo.index_name, ...headers] 
-                : headers;
+            
+            // 检查数据是否已经包含了索引列（统计结果有，数据读取没有）
+            const hasIndexColumnsInData = indexInfo && indexInfo.has_index && 
+                indexInfo.original_index_columns && 
+                indexInfo.original_index_columns.length > 0 &&
+                indexInfo.original_index_columns.every(col => headers.includes(col));
+            
+            let displayHeaders;
+            if (hasIndexColumnsInData) {
+                // 数据中已经包含索引列（统计结果），直接显示
+                displayHeaders = headers;
+            } else if (indexInfo && indexInfo.has_index) {
+                // 数据中没有索引列（数据读取），需要额外显示
+                if (indexInfo.is_multi_index && indexInfo.index_names) {
+                    // 过滤掉 null 或 undefined 的索引名
+                    const validIndexNames = indexInfo.index_names.filter(name => name !== null && name !== undefined);
+                    if (validIndexNames.length > 0) {
+                        displayHeaders = [...validIndexNames, ...headers];
+                    } else {
+                        // 如果索引名都是 null，使用默认名
+                        const defaultIndexNames = Array(indexInfo.index_levels).fill(0).map((_, i) => `index_${i}`);
+                        displayHeaders = [...defaultIndexNames, ...headers];
+                    }
+                } else if (indexInfo.index_name) {
+                    displayHeaders = [indexInfo.index_name, ...headers];
+                } else {
+                    // 没有索引名但有索引值，使用默认名
+                    displayHeaders = ['index', ...headers];
+                }
+            } else {
+                displayHeaders = headers;
+            }
             
             const thead = document.createElement('thead');
             const headerRow = document.createElement('tr');
@@ -896,17 +929,35 @@
             const displayData = showAll ? data : data.slice(0, 10);
             displayData.forEach((row, idx) => {
                 const tr = document.createElement('tr');
-                if (indexInfo && indexInfo.has_index) {
-                    const indexTd = document.createElement('td');
+                
+                if (!hasIndexColumnsInData && indexInfo && indexInfo.has_index) {
+                    // 数据中没有索引列，需要额外显示索引
                     const actualIdx = showAll ? idx : idx;
-                    indexTd.textContent = indexInfo.index_values[actualIdx] !== undefined ? indexInfo.index_values[actualIdx] : '';
-                    tr.appendChild(indexTd);
+                    if (indexInfo.is_multi_index && indexInfo.index_values) {
+                        // 多重索引
+                        const indexValue = indexInfo.index_values[actualIdx];
+                        if (Array.isArray(indexValue)) {
+                            indexValue.forEach(val => {
+                                const td = document.createElement('td');
+                                td.textContent = val !== undefined ? val : '';
+                                tr.appendChild(td);
+                            });
+                        }
+                    } else if (indexInfo.index_values) {
+                        // 单重索引
+                        const td = document.createElement('td');
+                        td.textContent = indexInfo.index_values[actualIdx] !== undefined ? indexInfo.index_values[actualIdx] : '';
+                        tr.appendChild(td);
+                    }
                 }
+                
+                // 显示数据列
                 headers.forEach(header => {
                     const td = document.createElement('td');
                     td.textContent = row[header] !== undefined ? row[header] : '';
                     tr.appendChild(td);
                 });
+                
                 tbody.appendChild(tr);
             });
             table.appendChild(tbody);
@@ -1175,50 +1226,16 @@
                     statsRaw.textContent = result.raw_response || '无原始输出';
                     
                     if (result.result) {
-                            const resultFileName = `${selectedData.fileName}_stats_result_${Date.now()}`;
-                            
-                            let formattedData = result.result;
-                            let actualRowCount = result.row_count;
-                            let actualColCount = result.col_count;
-                            let rawResult = result.result;
-                            
-                            if (result.data_type === 'series') {
-                                if (result.result.is_multi_index && result.result.index_names) {
-                                    formattedData = result.result.index.map((idx, i) => {
-                                        const row = {};
-                                        result.result.index_names.forEach((name, j) => {
-                                            row[name || `level_${j}`] = idx[j];
-                                        });
-                                        row[result.result.name || 'value'] = result.result.values[i];
-                                        return row;
-                                    });
-                                    actualRowCount = result.result.index.length;
-                                    actualColCount = result.result.index_names.length + 1;
-                                } else {
-                                    formattedData = result.result.index.map((idx, i) => ({
-                                        index: idx,
-                                        [result.result.name || 'value']: result.result.values[i]
-                                    }));
-                                    actualRowCount = result.result.index.length;
-                                    actualColCount = 2;
-                                }
-                            }
-                            
-                            // 确保传递索引信息，无论数据类型如何
-                            let indexInfo = null;
-                            if (result.index_info) {
-                                indexInfo = result.index_info;
-                            } else if (result.data_type === 'series') {
-                                // 为Series创建索引信息
-                                indexInfo = {
-                                    has_index: true,
-                                    index_name: result.result.name || 'index',
-                                    index_values: result.result.index
-                                };
-                            }
-                            
-                            addDataCard(resultFileName, formattedData, actualRowCount, actualColCount, true, result.data_type, result.result_desc || '(统计结果)', indexInfo || result.index_info || null, rawResult);
-                        }
+                        const resultFileName = `${selectedData.fileName}_stats_result_${Date.now()}`;
+                        
+                        const formattedData = result.result;
+                        const actualRowCount = result.row_count;
+                        const actualColCount = result.col_count;
+                        const dataType = result.data_type || 'dataframe';
+                        const indexInfo = result.index_info || null;
+                        
+                        addDataCard(resultFileName, formattedData, actualRowCount, actualColCount, true, dataType, result.result_desc || '(统计结果)', indexInfo);
+                    }
                 } else {
                     statsCode.textContent = `错误: ${result.error}`;
                     statsRaw.textContent = result.raw_response || '无原始输出';
