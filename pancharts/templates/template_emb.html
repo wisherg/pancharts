@@ -8,27 +8,15 @@
     {% endif %}
 </div>
 
-<script type="application/json" id="chart-config-{{ random_id }}">
-{
-    "random_id": {{ random_id }},
-    "theme": "{{ theme }}",
-    "renderer": "{{ renderer }}",
-    "option": {{ option|safe }},
-    "is_amap_chart": {% if is_amap_chart %}true{% else %}false{% endif %}
-}
-</script>
-
 <script>
     (function() {
-        var configId = 'chart-config-{{ random_id }}';
         var chartId = 'chart-{{ random_id }}';
         
         var initChart = function() {
-            var configEl = document.getElementById(configId);
             var chartDom = document.getElementById(chartId);
             
-            if (!configEl || !chartDom) {
-                console.warn('Chart config or container not found:', chartId);
+            if (!chartDom) {
+                console.warn('Chart container not found:', chartId);
                 return;
             }
             
@@ -43,20 +31,21 @@
             }
             
             try {
-                var config = JSON.parse(configEl.textContent);
-                var chart = echarts.init(chartDom, config.theme, { renderer: config.renderer });
-                chart.setOption(config.option);
+                // 直接赋值 option，避免 JSON.parse 解析问题
+                var option = {{ option|safe }};
+                var chart = echarts.init(chartDom, "{{ theme }}", { renderer: "{{ renderer }}" });
+                chart.setOption(option);
                 
-                if (config.is_amap_chart) {
-                    // 高德地图扩展组件初始化
-                    var amapComponent = chart.getModel().getComponent('amap');
-                    if (amapComponent) {
-                        var amap = amapComponent.getAMap();
-                        amap.addControl(new AMap.Scale());
-                        amap.addControl(new AMap.ToolBar());
-                        amapComponent.setEChartsLayerInteractive(true);
-                    }
+                {% if is_amap_chart %}
+                // 高德地图扩展组件初始化
+                var amapComponent = chart.getModel().getComponent('amap');
+                if (amapComponent) {
+                    var amap = amapComponent.getAMap();
+                    amap.addControl(new AMap.Scale());
+                    amap.addControl(new AMap.ToolBar());
+                    amapComponent.setEChartsLayerInteractive(true);
                 }
+                {% endif %}
                 
                 // 响应式处理
                 var resizeHandler = function() {
