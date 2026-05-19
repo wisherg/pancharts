@@ -8,7 +8,7 @@ with open("README.md", "r", encoding="utf-8") as f:
 
 setup(
     name="pancharts",
-    version="0.1.7.5",
+    version="0.1.8",
     author="Wang Peng",
     author_email="wangpeng_621@163.com",
     description="A Python library for generating ECharts visualizations",
@@ -32,7 +32,8 @@ setup(
         "fastapi>=0.100.0",
         "uvicorn>=0.20.0",
         "pydantic>=2.0.0",
-        "numpy>=1.19.0"
+        "numpy>=1.19.0",
+        "python-multipart>=0.0.5"
     ],
     classifiers=[
         "Programming Language :: Python :: 3",
