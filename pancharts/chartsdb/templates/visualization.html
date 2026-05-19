@@ -141,6 +141,40 @@
             font-weight: 600;
             color: #333;
         }
+        .checkbox-list-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            max-height: 150px;
+            overflow-y: auto;
+            background-color: #fafafa;
+        }
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            padding: 4px 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+            background-color: white;
+        }
+        .checkbox-item:hover {
+            background-color: #e8f4ff;
+            border-color: #1890ff;
+        }
+        .checkbox-item.selected {
+            background-color: #1890ff;
+            color: white;
+            border-color: #1890ff;
+        }
+        .checkbox-item input {
+            margin-right: 5px;
+        }
         .preview-note {
             background: #fff3cd;
             border: 1px solid #ffeeba;
@@ -149,6 +183,33 @@
             margin-bottom: 15px;
             font-size: 14px;
             color: #856404;
+        }
+        .table-container {
+            overflow-x: auto;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-bottom: 15px;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            min-width: 600px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 6px 10px;
+            text-align: left;
+            font-size: 12px;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            color: #333;
+            position: sticky;
+            top: 0;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9fa;
         }
         .options-container {
             display: flex;
@@ -268,8 +329,10 @@
             <div class="table-container">
                 <table id="data-preview-table"></table>
             </div>
-            <div class="preview-note">显示前 10 行数据 | 共 <span id="preview-row-count">0</span> 行 <span id="preview-col-count">0</span> 列</div>
-            <button class="btn btn-secondary btn-sm" onclick="togglePreviewDisplay()">显示全部</button>
+            <div style="margin-top: 10px; display: flex; justify-content: space-between; align-items: center;">
+                <div class="preview-note">显示前 10 行数据 | 共 <span id="preview-row-count">0</span> 行 <span id="preview-col-count">0</span> 列</div>
+                <button class="btn btn-secondary btn-sm" onclick="togglePreviewDisplay()">显示全部</button>
+            </div>
         </div>
         
         <div class="card">
@@ -285,9 +348,14 @@
                     </select>
                 </div>
                 <div class="form-group">
-                    <label for="index-columns">索引列：</label>
-                    <select id="index-columns" class="tag-input" multiple size="4" style="height: auto;"></select>
-                    <small class="form-text text-muted">按住Ctrl键可多选</small>
+                    <label>索引列：</label>
+                    <div id="index-columns-container" class="checkbox-list-container"></div>
+                    <small class="form-text text-muted">点击可选中或取消索引列</small>
+                </div>
+                <div class="form-group">
+                    <label>删除列：</label>
+                    <div id="drop-columns-container" class="checkbox-list-container"></div>
+                    <small class="form-text text-muted">点击可选中或取消要删除的列</small>
                 </div>
             </div>
         </div>
@@ -518,6 +586,14 @@
                 document.getElementById('data-type').textContent = 
                     visualizationData.dataType === 'series' ? 'Series' : 'DataFrame';
                 
+                // 设置数据类型默认值
+                const reconstructTypeSelect = document.getElementById('reconstruct-type');
+                if (visualizationData.dataType === 'series') {
+                    reconstructTypeSelect.value = 'series';
+                } else {
+                    reconstructTypeSelect.value = 'dataframe';
+                }
+                
                 renderDataPreview();
                 populateIndexColumns();
                 
@@ -535,22 +611,91 @@
         });
         
         function populateIndexColumns() {
-            const select = document.getElementById('index-columns');
-            select.innerHTML = '';
+            const indexContainer = document.getElementById('index-columns-container');
+            const dropContainer = document.getElementById('drop-columns-container');
+            indexContainer.innerHTML = '';
+            dropContainer.innerHTML = '';
             
             if (!visualizationData || !visualizationData.data || visualizationData.data.length === 0) {
                 return;
             }
             
-            // 获取所有列名
             const columns = Object.keys(visualizationData.data[0]);
+            const indexInfo = visualizationData.indexInfo || null;
+            const dataType = visualizationData.dataType || 'dataframe';
             
-            // 添加选项
+            // 检查数据是否已经包含了索引列
+            const hasIndexColumnsInData = indexInfo && indexInfo.has_index && 
+                indexInfo.original_index_columns && 
+                indexInfo.original_index_columns.length > 0 &&
+                indexInfo.original_index_columns.every(col => columns.includes(col));
+            
+            let defaultIndexColumns = [];
+            
+            if (hasIndexColumnsInData && indexInfo.original_index_columns) {
+                // 数据中已经包含索引列（统计结果），使用这些作为默认
+                defaultIndexColumns = indexInfo.original_index_columns.filter(col => columns.includes(col));
+            } else if (indexInfo && indexInfo.index_levels && indexInfo.index_names) {
+                // 数据中没有索引列（数据读取），根据索引信息选择
+                if (indexInfo.is_multi_index) {
+                    // 多重索引，使用索引名
+                    defaultIndexColumns = indexInfo.index_names.filter(name => name !== null);
+                } else if (indexInfo.index_name) {
+                    defaultIndexColumns = [indexInfo.index_name];
+                }
+            } else if (dataType === 'series') {
+                if (columns.length >= 2) {
+                    defaultIndexColumns = [columns[0]];
+                }
+            }
+            
             columns.forEach(column => {
-                const option = document.createElement('option');
-                option.value = column;
-                option.textContent = column;
-                select.appendChild(option);
+                // 创建索引列 checkbox
+                const indexDiv = document.createElement('div');
+                indexDiv.className = 'checkbox-item';
+                if (defaultIndexColumns.includes(column)) {
+                    indexDiv.classList.add('selected');
+                }
+                indexDiv.innerHTML = `<input type="checkbox" value="${column}" ${defaultIndexColumns.includes(column) ? 'checked' : ''}> ${column}`;
+                
+                // 为 checkbox 添加点击事件，避免与外层 div 冲突
+                const indexCheckbox = indexDiv.querySelector('input[type="checkbox"]');
+                indexCheckbox.onclick = function(e) {
+                    e.stopPropagation();
+                    indexDiv.classList.toggle('selected', this.checked);
+                };
+                
+                // 为外层 div 添加点击事件
+                indexDiv.onclick = function(e) {
+                    if (e.target !== indexCheckbox) {
+                        indexCheckbox.checked = !indexCheckbox.checked;
+                        indexDiv.classList.toggle('selected', indexCheckbox.checked);
+                    }
+                };
+                
+                indexContainer.appendChild(indexDiv);
+                
+                // 创建删除列 checkbox
+                const dropDiv = document.createElement('div');
+                dropDiv.className = 'checkbox-item';
+                dropDiv.innerHTML = `<input type="checkbox" value="${column}"> ${column}`;
+                
+                // 为 checkbox 添加点击事件
+                const dropCheckbox = dropDiv.querySelector('input[type="checkbox"]');
+                dropCheckbox.onclick = function(e) {
+                    e.stopPropagation();
+                    dropDiv.classList.toggle('selected', this.checked);
+                };
+                
+                // 为外层 div 添加点击事件
+                dropDiv.onclick = function(e) {
+                    if (e.target !== dropCheckbox) {
+                        dropCheckbox.checked = !dropCheckbox.checked;
+                        dropDiv.classList.toggle('selected', dropCheckbox.checked);
+                    }
+                };
+                
+                dropContainer.appendChild(dropDiv);
             });
         }
         
@@ -571,15 +716,22 @@
             const displayData = showAllPreview ? data : data.slice(0, 10);
             const headers = Object.keys(data[0]);
             
+            // 检查数据是否已经包含了索引列（统计结果有，数据读取没有）
+            const hasIndexColumnsInData = indexInfo && indexInfo.has_index && 
+                indexInfo.original_index_columns && 
+                indexInfo.original_index_columns.length > 0 &&
+                indexInfo.original_index_columns.every(col => headers.includes(col));
+            
             // 计算显示的列数
             let displayHeaders = headers;
             let actualColCount = headers.length;
             
-            if (indexInfo && indexInfo.has_index) {
+            if (!hasIndexColumnsInData && indexInfo && indexInfo.has_index) {
                 if (indexInfo.is_multi_index && indexInfo.index_names) {
                     // 多重索引
-                    displayHeaders = [...indexInfo.index_names, ...headers];
-                    actualColCount = indexInfo.index_names.length + headers.length;
+                    const validIndexNames = indexInfo.index_names.filter(name => name !== null && name !== undefined);
+                    displayHeaders = [...validIndexNames, ...headers];
+                    actualColCount = validIndexNames.length + headers.length;
                 } else if (indexInfo.index_name) {
                     // 单重索引
                     displayHeaders = [indexInfo.index_name, ...headers];
@@ -599,8 +751,8 @@
             displayData.forEach((row, idx) => {
                 html += '<tr>';
                 
-                // 显示索引列
-                if (indexInfo && indexInfo.has_index) {
+                // 显示索引列（只有数据中没有索引列时才显示）
+                if (!hasIndexColumnsInData && indexInfo && indexInfo.has_index) {
                     if (indexInfo.is_multi_index && indexInfo.index_values) {
                         // 多重索引
                         const actualIdx = showAllPreview ? idx : idx;
@@ -635,6 +787,17 @@
             renderDataPreview();
             const button = document.querySelector('button[onclick="togglePreviewDisplay()"]');
             button.textContent = showAllPreview ? '显示部分' : '显示全部';
+            
+            // 更新提示文本
+            const previewNote = document.querySelector('.preview-note');
+            if (previewNote && visualizationData) {
+                const dataLength = visualizationData.data ? visualizationData.data.length : 0;
+                if (showAllPreview) {
+                    previewNote.textContent = `显示全部 ${dataLength} 行数据`;
+                } else {
+                    previewNote.textContent = `显示前 ${Math.min(10, dataLength)} 行数据 | 共 ${dataLength} 行`;
+                }
+            }
         }
         
         function initEventListeners() {
@@ -716,8 +879,13 @@
             }
             
             const reconstructType = document.getElementById('reconstruct-type').value;
-            const selectElement = document.getElementById('index-columns');
-            const indexColumns = Array.from(selectElement.selectedOptions).map(option => option.value);
+            // 从 checkbox 列表中获取选中的索引列
+            const indexContainer = document.getElementById('index-columns-container');
+            const indexColumns = Array.from(indexContainer.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value);
+            
+            // 从 checkbox 列表中获取选中的删除列
+            const dropContainer = document.getElementById('drop-columns-container');
+            const dropColumns = Array.from(dropContainer.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value);
             
             const params = {};
             const methodParams = paramsMap[visClass]?.[method] || [];
@@ -744,6 +912,7 @@
                         data_type: visualizationData.dataType || 'dataframe',
                         reconstruct_type: reconstructType,
                         index_columns: indexColumns,
+                        drop_columns: dropColumns,
                         params: params,
                         index_info: visualizationData.indexInfo || null
                     })
