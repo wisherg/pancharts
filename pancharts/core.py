@@ -866,7 +866,7 @@ class Pancharts:
         
         # 深拷贝以避免修改原始数据
         option_for_nicegui = copy.deepcopy(merged_option)
-        
+
         # 移除pancharts特有的init配置
         if "init" in option_for_nicegui:
             del option_for_nicegui["init"]
